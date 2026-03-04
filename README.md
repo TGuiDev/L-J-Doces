@@ -40,29 +40,40 @@ Um aplicativo em **Flutter** estruturado em três pilares:
 ## 🚀 Funcionalidades (Backlog Rascunho)
 
 ### [Épico] Gestão de Inventário e Produtos
-- **RF01:** Cadastro, edição e exclusão de produtos.
-- **RF02:** Alertas automáticos de estoque crítico.
+- **RF-01:** Cadastro de produtos.
+- **RF-02:** Edição e exclusão de produtos.
+- **RF-05:** Alertas automáticos de estoque crítico.
 
 ### [Épico] Experiência do Cliente
-- **RF03:** Catálogo digital em tempo real para verificação de disponibilidade.
+- **RF-03:** Catálogo digital em tempo real para verificação de disponibilidade.
 - Sistema de fidelização digital
 - Pagamento via QR Code ou ChavePix.
 
 ### [Épico] Financeiro e Operacional
-- Registro de vendas a prazo ("Penduricalhos").
-- Cálculo automático de lucro real.
-- **Modo Offline:** Registro de vendas sem internet com sincronização posterior.
+- **RF-06:** Registro de vendas.
+- **RF-07:** Registro de vendas a prazo ("Penduricalhos").
+- **RF-08:** Cálculo automático de lucro real.
+- **RF-09:** Modo Offline com sincronização posterior.
 
 ### [Épico] Inteligência de Dados
-- Modelo preditivo para análise de tendências de vendas.
-- Sugestão automática de volume de produção diária.
+- **RF-10:** Modelo preditivo para análise de tendências e sugestão de produção diária.
+
+---
+
+## 📏 Regras de Negócio (RN)
+* **RN-01:** Produto sem estoque deve aparecer como indisponível no cardápio.
+* **RN-04:** Venda a prazo deve ter identificação do cliente e data prevista de pagamento.
+* **RN-05:** Toda venda finalizada deve atualizar automaticamente o saldo de estoque.
+* **RN-08:** Sugestão da IA é recomendação e exige confirmação do usuário.
 
 ---
 
 ## ⚙️ Requisitos Não Funcionais (RNF)
-* **RNF01:** Desenvolvimento obrigatório em framework Flutter.
-* **RNF02:** Design responsivo para múltiplos dispositivos móveis.
-* **RNF03:** Desempenho: Atualização de estoque em até 2 segundos.
+* **RNF-01:** Desenvolvimento obrigatório em framework Flutter.
+* **RNF-02:** Design responsivo para múltiplos dispositivos móveis.
+* **RNF-03:** Atualização de estoque/disponibilidade em até 2 segundos.
+* **RNF-05:** Operação offline sem perda de dados locais.
+* **RNF-06:** Proteção de dados com boas práticas e comunicação segura (HTTPS).
 
 ---
 
@@ -71,6 +82,16 @@ A qualidade do software será garantida através das seguintes camadas de teste:
 * **Testes Unitários:** Validação das funções lógicas de cálculo e estoque.
 * **Testes de Interface (Widget Tests):** Verificação da navegação e interatividade do cardápio.
 * **Ferramentas:** Uso do pacote nativo `flutter_test`.
+
+---
+
+## 📚 Documentação de Requisitos e Colaboração
+- Requisitos Funcionais: `docs/RF.md`
+- Regras de Negócio: `docs/RN.md`
+- Requisitos Não Funcionais: `docs/RNF.md`
+- Guia de contribuição: `CONTRIBUTING.md`
+- Template de Pull Request: `.github/PULL_REQUEST_TEMPLATE.md`
+- Templates de Issue: `.github/ISSUE_TEMPLATE/`
 
 ---
 
