@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const port = Number(process.env.PORT) || 3000;
 
   // Configurar CORS para aceitar localhost em qualquer porta + futuro Android
   app.enableCors({
@@ -21,7 +22,7 @@ async function bootstrap() {
     transform: true,
   }));
 
-  await app.listen(3000);
-  console.log(`✅ Server is running on http://localhost:3000`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`✅ Server is running on http://localhost:${port}`);
 }
 bootstrap();

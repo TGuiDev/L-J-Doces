@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AdminMenuScreen extends StatelessWidget {
-  const AdminMenuScreen({Key? key}) : super(key: key);
+  const AdminMenuScreen({super.key});
 
   Widget _buildMenuCard(BuildContext context, String title, IconData icon, String route) {
     return Card(
@@ -46,16 +46,16 @@ class AdminMenuScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF7E6), // Fundo claro baseado no layout
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.orange,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xffffffff)),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Painel de Administração',
           style: TextStyle(
-            color: Color(0xFF0F172A),
+            color: Color(0xFFFFFFFF),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -71,8 +71,8 @@ class AdminMenuScreen extends StatelessWidget {
             _buildMenuCard(context, 'Pedidos', Icons.shopping_bag_outlined, '/admin/orders'),
             _buildMenuCard(context, 'Produtos', Icons.inventory_2_outlined, '/admin/products'),
             _buildMenuCard(context, 'Banners', Icons.view_carousel_outlined, '/admin/banners'),
-            _buildMenuCard(context, 'Vendas', Icons.attach_money, ''),
-            _buildMenuCard(context, 'Resumo Operacional', Icons.analytics_outlined, ''),
+            _buildMenuCard(context, 'Vendas', Icons.attach_money, '/admin/sales'),
+            _buildMenuCard(context, 'Resumo Operacional', Icons.analytics_outlined, '/admin/analytics'),
           ],
         ),
       ),

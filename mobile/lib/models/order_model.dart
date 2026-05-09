@@ -26,12 +26,12 @@ class Order {
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: (json['id'] ?? '').toString(),
-        userId: (json['user_id'] ?? '').toString(),
-        customerName: (json['user'] != null && json['user']['name'] != null)
+      userId: (json['user_id'] ?? '').toString(),
+      customerName: (json['user'] != null && json['user']['name'] != null)
           ? json['user']['name'].toString()
           : (json['user'] != null && json['user']['email'] != null)
-            ? json['user']['email'].toString()
-            : null,
+              ? json['user']['email'].toString()
+              : null,
       status: (json['status'] ?? 'unknown').toString(),
       totalAmount: (() {
         try {
@@ -45,10 +45,12 @@ class Order {
               .toList() ??
           [],
       payment: json['payments'] != null && (json['payments'] as List).isNotEmpty
-          ? Payment.fromJson(Map<String, dynamic>.from((json['payments'] as List)[0] ?? {}))
+          ? Payment.fromJson(
+              Map<String, dynamic>.from((json['payments'] as List)[0] ?? {}))
           : null,
       tracking: (json['order_tracking'] as List?)
-              ?.map((track) => OrderTracking.fromJson(track as Map<String, dynamic>))
+              ?.map((track) =>
+                  OrderTracking.fromJson(track as Map<String, dynamic>))
               .toList() ??
           [],
       createdAt: json['created_at'] != null
@@ -63,7 +65,7 @@ class Order {
   Map<String, dynamic> toJson() => {
         'id': id,
         'user_id': userId,
-      if (customerName != null) 'user_name': customerName,
+        if (customerName != null) 'user_name': customerName,
         'status': status,
         'total_amount': totalAmount,
         'created_at': createdAt.toIso8601String(),
@@ -79,6 +81,7 @@ class OrderItem {
   final double unitPrice;
   final String? observation;
   final DateTime createdAt;
+  final Map<String, dynamic>? product; // Product data if available
 
   OrderItem({
     required this.id,
@@ -88,6 +91,7 @@ class OrderItem {
     required this.unitPrice,
     this.observation,
     required this.createdAt,
+    this.product,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -109,6 +113,17 @@ class OrderItem {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
+      // Supabase retorna como array: 'products' ou pode vir como 'product'
+      product: (() {
+        if (json['products'] is List) {
+          final products = json['products'] as List?;
+          return products?.isNotEmpty == true
+              ? products![0] as Map<String, dynamic>?
+              : null;
+        } else {
+          return json['product'] as Map<String, dynamic>?;
+        }
+      })(),
     );
   }
 
@@ -161,7 +176,9 @@ class Payment {
       paymentMethod: (json['payment_method'] ?? 'simulated').toString(),
       transactionId: json['transaction_id']?.toString(),
       receiptNumber: json['receipt_number']?.toString(),
-      paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at'].toString()) : null,
+      paidAt: json['paid_at'] != null
+          ? DateTime.tryParse(json['paid_at'].toString())
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),

@@ -10,8 +10,12 @@ class AdminProvider with ChangeNotifier {
 
   List<Category> _categories = [];
   List<Product> _products = [];
+  List<Product> _allProducts = [];
   List<BannerModel> _banners = [];
   bool _isLoading = false;
+  int _currentProductPage = 0;
+  bool _hasMoreProducts = true;
+  static const int _productsPageSize = 12;
 
   AdminProvider({required ApiService apiService}) : _apiService = apiService;
 
@@ -19,6 +23,8 @@ class AdminProvider with ChangeNotifier {
   List<Product> get products => _products;
   List<BannerModel> get banners => _banners;
   bool get isLoading => _isLoading;
+  bool get isLoadingProducts => _isLoading;
+  bool get hasMoreProducts => _hasMoreProducts;
 
   Future<void> fetchCategories() async {
     _isLoading = true;
@@ -33,10 +39,52 @@ class AdminProvider with ChangeNotifier {
   }
 
   Future<void> fetchProducts() async {
+    await fetchProductsPage(refresh: true);
+  }
+
+  Future<void> fetchProductsPage({
+    bool refresh = false,
+    String? categoryId,
+    String? subcategoryId,
+  }) async {
+    if (_isLoading && !refresh) return;
+
     _isLoading = true;
     notifyListeners();
     try {
-      _products = await _apiService.getProducts();
+      if (refresh || _allProducts.isEmpty) {
+        _allProducts = await _apiService.getProducts();
+        _currentProductPage = 0;
+        _hasMoreProducts = true;
+        _products = [];
+      }
+
+      final filteredProducts = _allProducts.where((product) {
+        final matchesCategory =
+            categoryId == null || product.categoryId == categoryId;
+        final matchesSubcategory =
+            subcategoryId == null || product.subcategoryId == subcategoryId;
+        return matchesCategory && matchesSubcategory;
+      }).toList();
+
+      final startIndex = _currentProductPage * _productsPageSize;
+      if (startIndex >= filteredProducts.length) {
+        _hasMoreProducts = false;
+        return;
+      }
+
+      final endIndex = (startIndex + _productsPageSize)
+          .clamp(0, filteredProducts.length);
+      final nextPage = filteredProducts.sublist(startIndex, endIndex);
+
+      if (refresh) {
+        _products = nextPage;
+      } else {
+        _products = [..._products, ...nextPage];
+      }
+
+      _currentProductPage++;
+      _hasMoreProducts = endIndex < filteredProducts.length;
     } catch (e) {
       print('Erro ao carregar produtos: $e');
     }

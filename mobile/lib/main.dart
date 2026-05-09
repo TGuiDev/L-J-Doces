@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
@@ -6,9 +7,12 @@ import 'providers/admin_provider.dart';
 import 'providers/favorites_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/orders_provider.dart';
+import 'providers/stock_sync_provider.dart';
+import 'providers/orders_sync_provider.dart';
 import 'services/api_service.dart';
 import 'services/storage_service.dart';
 import 'services/firebase_service.dart';
+import 'services/socket_service.dart';
 import 'screens/signin_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/reset_password_screen.dart';
@@ -18,7 +22,9 @@ import 'screens/splash_screen.dart';
 import 'screens/admin_menu_screen.dart';
 import 'screens/admin_banners_screen.dart';
 import 'screens/admin_products_screen.dart';
+import 'screens/admin_sales_screen.dart';
 import 'screens/admin_orders_screen.dart';
+import 'screens/analytics_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
 import 'theme/app_theme.dart';
@@ -55,7 +61,8 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _initializationFuture = _initializeProviders();
-    _handleIncomingLinks();
+    // Remover a chamada de _handleIncomingLinks aqui
+    // O Flutter está tentando processar /admin como rota inicial, causando erro
   }
 
   Future<void> _initializeProviders() async {
@@ -71,17 +78,18 @@ class _MyAppState extends State<MyApp> {
     _favoritesProvider = FavoritesProvider(apiService: _apiService);
 
     await _authProvider.init();
+
+    // Inicializar Socket.io para real-time updates
+    final socketService = SocketService();
+    final backendUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
+    await socketService.initialize(backendUrl);
   }
 
-  void _handleIncomingLinks() {
-    // Handle deep links quando o app já está aberto
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final uri = WidgetsBinding.instance.platformDispatcher.defaultRouteName;
-      if (uri != '/' && uri.isNotEmpty) {
-        _handleDeepLink(Uri.parse(uri));
-      }
-    });
-  }
+  // void _handleIncomingLinks() {
+  //   // Desabilizado - causava erro ao tentar processar /admin como rota inicial
+  //   // O Flutter tenta usar platformDispatcher.defaultRouteName como rota inicial,
+  //   // mas isso causa conflito com rotas normais do app
+  // }
 
   void _handleDeepLink(Uri uri) {
     if (uri.scheme == 'lejdoces' && uri.path == '/reset-password') {
@@ -96,24 +104,31 @@ class _MyAppState extends State<MyApp> {
       future: _initializationFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // Mostrar loading enquanto inicializa
-          return const MaterialApp(
+          // Mostrar loading enquanto inicializa.
+          // Definir `initialRoute: '/'` aqui evita que o Flutter tente navegar
+          // para `platformDispatcher.defaultRouteName` (ex.: "/admin") antes
+          // das rotas estarem registradas na árvore principal.
+          return MaterialApp(
             debugShowCheckedModeBanner: false,
-            home: Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
+            onGenerateInitialRoutes: (_) => [
+              MaterialPageRoute(
+                builder: (_) => const _LoadingScreen(),
               ),
-            ),
+            ],
           );
         }
 
         return MultiProvider(
           providers: [
+            Provider<ApiService>.value(value: _apiService),
             ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
             ChangeNotifierProvider<AdminProvider>.value(value: _adminProvider),
             ChangeNotifierProvider<FavoritesProvider>.value(value: _favoritesProvider),
             ChangeNotifierProvider(create: (_) => CartProvider()),
             ChangeNotifierProvider(create: (_) => OrdersProvider(apiService: _apiService)),
+            ChangeNotifierProvider(create: (_) => StockSyncProvider()),
+            ChangeNotifierProvider(create: (_) => OrdersSyncProvider()),
+            ChangeNotifierProvider<SocketService>.value(value: SocketService()),
           ],
           child: MaterialApp(
             navigatorKey: navigatorKey,
@@ -122,15 +137,30 @@ class _MyAppState extends State<MyApp> {
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.light,
             debugShowCheckedModeBanner: false,
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('pt', 'BR'),
+              Locale('en', 'US'),
+            ],
+            locale: const Locale('pt', 'BR'),
             home: Consumer<AuthProvider>(
               builder: (context, authProvider, _) {
                 // Mostrar splash screen enquanto carrega
                 if (authProvider.isLoading) {
-                  return const SplashScreen();
+                  // Substituído pela tela de carregamento simples
+                  return const Scaffold(
+                    body: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
                 }
 
                 // O aplicativo sempre iniciará na HomeScreen agora
-                return HomeScreen(key: HomeScreen.globalKey);
+                return const HomeScreen();
               },
             ),
             routes: {
@@ -145,22 +175,105 @@ class _MyAppState extends State<MyApp> {
               '/admin/banners': (context) => const AdminBannersScreen(),
               '/admin/products': (context) => const AdminProductsScreen(),
               '/admin/orders': (context) => const AdminOrdersScreen(),
+              '/admin/sales': (context) => const AdminSalesScreen(),
+              '/admin/analytics': (context) => const AnalyticsScreen(),
             },
             onGenerateRoute: (settings) {
-              // Handle deep links
-              if (settings.name != null) {
-                final uri = Uri.parse(settings.name!);
-                if (uri.scheme == 'lejdoces' && uri.path == '/reset-password') {
+              final routeName = settings.name;
+
+              if (routeName == null || routeName.isEmpty) {
+                return MaterialPageRoute(
+                  builder: (context) => const HomeScreen(),
+                );
+              }
+
+              final uri = Uri.tryParse(routeName);
+              if (uri != null && uri.scheme == 'lejdoces' && uri.path == '/reset-password') {
+                return MaterialPageRoute(
+                  builder: (context) => const ResetPasswordScreen(),
+                );
+              }
+
+              switch (routeName) {
+                case '/checkout':
+                  return MaterialPageRoute(
+                    builder: (context) => const CheckoutScreen(),
+                  );
+                case '/signin':
+                  return MaterialPageRoute(
+                    builder: (context) => const SignInScreen(),
+                  );
+                case '/signup':
+                  return MaterialPageRoute(
+                    builder: (context) => const SignUpScreen(),
+                  );
+                case '/reset-password':
                   return MaterialPageRoute(
                     builder: (context) => const ResetPasswordScreen(),
                   );
-                }
+                case '/home':
+                  return MaterialPageRoute(
+                    builder: (context) => const HomeScreen(),
+                  );
+                case '/profile':
+                  return MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  );
+                case '/orders':
+                  return MaterialPageRoute(
+                    builder: (context) => const OrdersScreen(),
+                  );
+                case '/admin':
+                  return MaterialPageRoute(
+                    builder: (context) => const AdminMenuScreen(),
+                  );
+                case '/admin/banners':
+                  return MaterialPageRoute(
+                    builder: (context) => const AdminBannersScreen(),
+                  );
+                case '/admin/products':
+                  return MaterialPageRoute(
+                    builder: (context) => const AdminProductsScreen(),
+                  );
+                case '/admin/orders':
+                  return MaterialPageRoute(
+                    builder: (context) => const AdminOrdersScreen(),
+                  );
+                case '/admin/sales':
+                  return MaterialPageRoute(
+                    builder: (context) => const AdminSalesScreen(),
+                  );
+                case '/admin/analytics':
+                  return MaterialPageRoute(
+                    builder: (context) => const AnalyticsScreen(),
+                  );
               }
-              return null;
+
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
+            },
+            onUnknownRoute: (settings) {
+              return MaterialPageRoute(
+                builder: (context) => const HomeScreen(),
+              );
             },
           ),
         );
       },
+    );
+  }
+}
+
+class _LoadingScreen extends StatelessWidget {
+  const _LoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 }

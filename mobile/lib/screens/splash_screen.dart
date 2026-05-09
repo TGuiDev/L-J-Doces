@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -15,7 +15,7 @@ class _SplashScreenState extends State<SplashScreen> {
     Future.delayed(const Duration(seconds: 3), () {
       // Navega automaticamente após 3 segundos
       if (mounted) {
-          Navigator.maybePop(context);
+        Navigator.maybePop(context);
       }
     });
   }
@@ -30,6 +30,7 @@ class _SplashScreenState extends State<SplashScreen> {
             end: Alignment.bottomRight,
             colors: [
               const Color(0xFFFF8C00),
+              // ignore: deprecated_member_use
               const Color(0xFFFFA500).withOpacity(0.8),
             ],
           ),

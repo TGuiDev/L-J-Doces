@@ -24,12 +24,12 @@ class AppTheme {
         tertiary: accentOrange,
       ),
       scaffoldBackgroundColor: backgroundColor,
-      appBarTheme: AppBarThemeData(
+      appBarTheme: const AppBarThemeData(
         elevation: 0,
         centerTitle: true,
         backgroundColor: primaryOrange,
         foregroundColor: Colors.white,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: Colors.white,
@@ -163,12 +163,12 @@ class AppTheme {
         tertiary: darkOrange,
       ),
       scaffoldBackgroundColor: const Color(0xFF1a1a1a),
-      appBarTheme: AppBarThemeData(
+      appBarTheme: const AppBarThemeData(
         elevation: 0,
         centerTitle: true,
         backgroundColor: darkOrange,
         foregroundColor: Colors.white,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: Colors.white,

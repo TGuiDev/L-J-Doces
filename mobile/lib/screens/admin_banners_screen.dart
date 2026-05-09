@@ -4,12 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/admin_provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/api_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AdminBannersScreen extends StatefulWidget {
-  const AdminBannersScreen({Key? key}) : super(key: key);
+  const AdminBannersScreen({super.key});
 
   @override
   State<AdminBannersScreen> createState() => _AdminBannersScreenState();
@@ -36,9 +35,9 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
         "file": await MultipartFile.fromFile(imageFile.path, filename: fileName),
       });
 
-      final oldAuth = dio.options.headers['Authorization'];
+      // ignore: use_build_context_synchronously
       dio.options.headers['Authorization'] = 'Bearer ${context.read<AuthProvider>().token}';
-      
+
       final response = await dio.post(
         '$baseUrl/upload',
         data: formData,
@@ -49,6 +48,7 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
       }
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print('Erro no upload: $e');
       return null;
     }
@@ -61,11 +61,13 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
     setState(() => _isUploading = true);
 
     try {
+      // ignore: use_build_context_synchronously
       final token = context.read<AuthProvider>().token;
       if (token == null) throw Exception('Não autenticado');
 
       final imageUrl = await _uploadImage(File(image.path));
       if (imageUrl != null) {
+      // ignore: use_build_context_synchronously
         final success = await context.read<AdminProvider>().createBanner(token, imageUrl, true);
         if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -107,8 +109,8 @@ class _AdminBannersScreenState extends State<AdminBannersScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isUploading ? null : _pickAndUploadBanner,
         backgroundColor: Colors.orange[800],
-        icon: _isUploading 
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+        icon: _isUploading
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : const Icon(Icons.add_photo_alternate),
         label: Text(_isUploading ? 'Enviando...' : 'Novo Banner'),
       ),

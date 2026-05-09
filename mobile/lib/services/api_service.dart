@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import "../models/category_model.dart";
 import "../models/product_model.dart";
+import "../models/analytics_model.dart";
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/auth_response.dart';
 
@@ -389,8 +390,10 @@ class ApiService {
       'images': product.images,
       'category_id': product.categoryId,
       'subcategory_id': product.subcategoryId,
-      'available_days':
-          product.availableDays.map((k, v) => MapEntry(k.toString(), v)),
+      'available_days': {
+        for (final entry in product.availableDays.entries)
+          entry.key.toString(): entry.value
+      },
       'stock_quantity': product.stockQuantity,
     });
   }
@@ -405,8 +408,10 @@ class ApiService {
       'images': product.images,
       'category_id': product.categoryId,
       'subcategory_id': product.subcategoryId,
-      'available_days':
-          product.availableDays.map((k, v) => MapEntry(k.toString(), v)),
+      'available_days': {
+        for (final entry in product.availableDays.entries)
+          entry.key.toString(): entry.value
+      },
       'stock_quantity': product.stockQuantity,
     });
   }
@@ -549,6 +554,43 @@ class ApiService {
       await _dio.delete(path, options: options);
     } catch (e) {
       print('ApiService.delete error on $path: $e');
+      rethrow;
+    }
+  }
+
+  Future<OperationalSummary> getOperationalSummary({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final params = <String, dynamic>{};
+
+      if (startDate != null) {
+        params['startDate'] = startDate;
+      }
+
+      if (endDate != null) {
+        params['endDate'] = endDate;
+      }
+
+      final response = await _dio.get(
+        '/analytics/operational-summary',
+        queryParameters: params,
+      );
+
+      return OperationalSummary.fromJson(
+        Map<String, dynamic>.from(response.data),
+      );
+    } on DioException catch (e) {
+      print('ApiService.getOperationalSummary Dio error: ${e.response?.data}');
+
+      throw Exception(
+        e.response?.data?['message'] ??
+            e.response?.data?['error'] ??
+            'Erro ao gerar resumo operacional',
+      );
+    } catch (e) {
+      print('ApiService.getOperationalSummary error: $e');
       rethrow;
     }
   }

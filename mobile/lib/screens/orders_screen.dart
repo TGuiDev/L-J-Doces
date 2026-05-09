@@ -16,6 +16,8 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
+  String _dateFilter = 'all'; // 'all', '24h', '7d', 'custom'
+  DateTimeRange? _customDateRange;
   String? _loadedToken;
   // Mantém referência para remover o listener
   late final AuthProvider _authProvider;
@@ -104,6 +106,46 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  List<Order> _applyDateFilter(List<Order> orders) {
+    final now = DateTime.now();
+    switch (_dateFilter) {
+      case '24h':
+        final cutoff = now.subtract(const Duration(hours: 24));
+        return orders.where((o) => o.createdAt.isAfter(cutoff)).toList();
+      case '7d':
+        final cutoff = now.subtract(const Duration(days: 7));
+        return orders.where((o) => o.createdAt.isAfter(cutoff)).toList();
+      case 'custom':
+        if (_customDateRange != null) {
+          return orders
+              .where((o) =>
+                  o.createdAt.isAfter(_customDateRange!.start) &&
+                  o.createdAt.isBefore(_customDateRange!.end.add(const Duration(days: 1))))
+              .toList();
+        }
+        return orders;
+      case 'all':
+      default:
+        return orders;
+    }
+  }
+
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _customDateRange,
+      locale: const Locale('pt', 'BR'),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _customDateRange = picked;
+        _dateFilter = 'custom';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,7 +161,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
               )
             : null,
       ),
-      body: Consumer<OrdersProvider>(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildDateFilterChip('Todos', 'all'),
+                  _buildDateFilterChip('24h', '24h'),
+                  _buildDateFilterChip('7 dias', '7d'),
+                  _buildDateFilterChip('Customizado', 'custom'),
+                  if (_dateFilter == 'custom' && _customDateRange != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Chip(
+                        label: Text(
+                          '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        onDeleted: () {
+                          setState(() {
+                            _customDateRange = null;
+                            _dateFilter = 'all';
+                          });
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Consumer<OrdersProvider>(
         builder: (context, ordersProvider, child) {
           if (ordersProvider.isLoading) {
             return const Center(
@@ -162,15 +237,55 @@ class _OrdersScreenState extends State<OrdersScreen> {
             );
           }
 
+          // Aplicar filtro de data
+          var orders = _applyDateFilter(ordersProvider.orders);
+
+          if (orders.isEmpty) {
+            return Center(
+              child: Text(
+                'Nenhuma compra encontrada neste período',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+            );
+          }
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: ordersProvider.orders.length,
+            itemCount: orders.length,
             itemBuilder: (context, index) {
-              final order = ordersProvider.orders[index];
+              final order = orders[index];
               return _buildOrderCard(context, order);
             },
           );
         },
+      ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateFilterChip(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: _dateFilter == value,
+        onSelected: (selected) {
+          if (value == 'custom') {
+            _selectDateRange();
+          } else {
+            setState(() {
+              _dateFilter = value;
+              _customDateRange = null;
+            });
+          }
+        },
+        selectedColor: Colors.orange,
+        labelStyle: TextStyle(
+          color: _dateFilter == value ? Colors.white : Colors.black87,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

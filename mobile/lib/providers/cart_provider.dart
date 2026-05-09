@@ -27,14 +27,26 @@ class CartProvider with ChangeNotifier {
 
   double get totalPrice => totalAmount;
 
-  void addItem(Product product, {int quantity = 1, String observation = ''}) {
+  bool addItem(Product product, {int quantity = 1, String observation = ''}) {
+    if (quantity <= 0 || product.stockQuantity <= 0) {
+      return false;
+    }
+
+    final currentQuantity = _items[product.id]?.quantity ?? 0;
+    if (currentQuantity >= product.stockQuantity) {
+      return false;
+    }
+
+    final nextQuantity = currentQuantity + quantity;
+    final safeQuantity = nextQuantity > product.stockQuantity ? product.stockQuantity : nextQuantity;
+
     if (_items.containsKey(product.id)) {
       _items.update(
         product.id,
         (existingItem) => CartItem(
           id: existingItem.id,
           product: existingItem.product,
-          quantity: existingItem.quantity + quantity,
+          quantity: safeQuantity,
           observation: observation.isNotEmpty ? observation : existingItem.observation,
         ),
       );
@@ -44,12 +56,13 @@ class CartProvider with ChangeNotifier {
         () => CartItem(
           id: DateTime.now().toString(),
           product: product,
-          quantity: quantity,
+          quantity: safeQuantity,
           observation: observation,
         ),
       );
     }
     notifyListeners();
+    return true;
   }
 
   void removeItem(String productId) {

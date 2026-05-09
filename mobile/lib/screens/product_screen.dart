@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/stock_sync_provider.dart';
 import '../widgets/favorite_icon.dart';
 import 'cart_screen.dart';
 import 'home_screen.dart';
@@ -24,6 +25,37 @@ class _ProductScreenState extends State<ProductScreen> {
   final PageController _pageController = PageController();
   int _quantity = 1;
   final TextEditingController _obsController = TextEditingController();
+  StockSyncProvider? _stockSyncProvider;
+  int _currentStockQuantity = 0;
+  void Function(int)? _stockListener;
+
+  @override
+  void initState() {
+    super.initState();
+    // Inscrever-se nas atualizações de estoque em tempo real
+    _stockSyncProvider = context.read<StockSyncProvider>();
+
+    // Verificar se existe valor em cache; senão, usar do produto e cachear
+    final cachedStock = _stockSyncProvider?.getProductStock(widget.product.id);
+    if (cachedStock != null) {
+      _currentStockQuantity = cachedStock;
+    } else {
+      _currentStockQuantity = widget.product.stockQuantity;
+      _stockSyncProvider?.setProductStock(widget.product.id, widget.product.stockQuantity);
+    }
+
+    _stockListener = (newQuantity) {
+      // Atualizar o produto localmente
+      if (!mounted) return;
+      setState(() {
+        _currentStockQuantity = newQuantity;
+        if (_quantity > _currentStockQuantity) {
+          _quantity = _currentStockQuantity > 0 ? _currentStockQuantity : 1;
+        }
+      });
+    };
+    _stockSyncProvider?.subscribeToProductStock(widget.product.id, _stockListener!);
+  }
 
   void _incrementQuantity() {
     setState(() => _quantity++);
@@ -37,7 +69,18 @@ class _ProductScreenState extends State<ProductScreen> {
 
   void _addToCartAndShowDialog() {
     final cart = context.read<CartProvider>();
-    cart.addItem(widget.product, quantity: _quantity, observation: _obsController.text.trim());
+    final added = cart.addItem(
+      widget.product,
+      quantity: _quantity,
+      observation: _obsController.text.trim(),
+    );
+
+    if (!added) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não há estoque suficiente para adicionar mais itens.')),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -103,6 +146,11 @@ class _ProductScreenState extends State<ProductScreen> {
 
   @override
   void dispose() {
+    final stockSyncProvider = _stockSyncProvider;
+    final stockListener = _stockListener;
+    if (stockSyncProvider != null && stockListener != null) {
+      stockSyncProvider.unsubscribeFromProductStock(widget.product.id, stockListener);
+    }
     _pageController.dispose();
     _obsController.dispose();
     super.dispose();
@@ -111,6 +159,11 @@ class _ProductScreenState extends State<ProductScreen> {
   @override
   Widget build(BuildContext context) {
     final prod = widget.product;
+    final cart = context.watch<CartProvider>();
+    final currentInCart = cart.items[prod.id]?.quantity ?? 0;
+    final availableToAdd = _currentStockQuantity - currentInCart;
+    final canIncrease = availableToAdd > _quantity;
+    final canAddSelectedQuantity = availableToAdd > 0 && availableToAdd >= _quantity;
     final images = prod.images.isNotEmpty
       ? prod.images
       : [
@@ -343,7 +396,7 @@ class _ProductScreenState extends State<ProductScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (prod.isAvailableToday)
-                    if (prod.stockQuantity > 0)
+                    if (_currentStockQuantity > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -351,7 +404,7 @@ class _ProductScreenState extends State<ProductScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'Em Estoque (${prod.stockQuantity})',
+                          'Em Estoque ($_currentStockQuantity)',
                           style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                       )
@@ -519,7 +572,7 @@ class _ProductScreenState extends State<ProductScreen> {
                             fontWeight: FontWeight.bold, fontSize: 16)),
                     IconButton(
                       icon: const Icon(Icons.add),
-                      onPressed: (prod.stockQuantity > _quantity) ? _incrementQuantity : null,
+                      onPressed: canIncrease ? _incrementQuantity : null,
                       color: Colors.orange[800],
                       disabledColor: Colors.grey[400],
                     ),
@@ -529,7 +582,7 @@ class _ProductScreenState extends State<ProductScreen> {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: (prod.stockQuantity > 0 && prod.isAvailableToday) ? _addToCartAndShowDialog : null,
+                  onPressed: (canAddSelectedQuantity && prod.isAvailableToday) ? _addToCartAndShowDialog : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange[600],
                     disabledBackgroundColor: Colors.grey[300],
@@ -544,17 +597,17 @@ class _ProductScreenState extends State<ProductScreen> {
                     children: [
                       Icon(
                         Icons.shopping_bag_outlined,
-                        color: (prod.stockQuantity > 0 && prod.isAvailableToday) ? Colors.white : Colors.grey[600]
+                        color: (_currentStockQuantity > 0 && prod.isAvailableToday) ? Colors.white : Colors.grey[600]
                       ),
                       const SizedBox(width: 8),
                       Text(
                         !prod.isAvailableToday
                             ? 'Fora de rodízio'
-                            : (prod.stockQuantity > 0 ? 'Adicionar à sacola' : 'Esgotado'),
+                          : (availableToAdd > 0 ? 'Adicionar à sacola' : 'Estoque indisponível'),
                         style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: (prod.stockQuantity > 0 && prod.isAvailableToday) ? Colors.white : Colors.grey[600]),
+                            color: (_currentStockQuantity > 0 && prod.isAvailableToday) ? Colors.white : Colors.grey[600]),
                       ),
                     ],
                   ),
