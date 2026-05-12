@@ -30,13 +30,13 @@ class ApiService {
       onResponse: (response, handler) {
         print(
             '[DIO] RESPONSE ${response.statusCode}: ${response.requestOptions.path}');
-        print('[DIO] Response data: ${response.data}');
+        // print('[DIO] Response data: ${response.data}');
         return handler.next(response);
       },
       onError: (error, handler) {
         print('[DIO] ERROR: ${error.requestOptions.path}');
         print('[DIO] Status: ${error.response?.statusCode}');
-        print('[DIO] Response data: ${error.response?.data}');
+        print('[DIO] Response data error?: ${error.response?.data}');
         print('[DIO] Error message: ${error.message}');
         return handler.next(error);
       },
@@ -303,26 +303,23 @@ class ApiService {
     try {
       final response = await _dio.get('/products');
       return (response.data as List).map((json) {
-        return Product(
-          id: json['id']?.toString() ?? '',
-          name: json['name']?.toString() ?? '',
-          description: json['description']?.toString() ?? '',
-          ingredients: json['ingredients']?.toString() ?? '',
-          price: (json['price'] ?? 0).toDouble(),
-          costPrice: (json['cost_price'] ?? 0).toDouble(),
-          images: List<String>.from(json['images'] ?? []),
-          categoryId: json['category_id']?.toString() ?? '',
-          subcategoryId: json['subcategory_id']?.toString(),
-          availableDays: Map<int, bool>.from((json['available_days'] as Map?)
-                  ?.map((key, value) =>
-                      MapEntry(int.parse(key.toString()), value as bool)) ??
-              {}),
-          stockQuantity: json['stock_quantity'] ?? 0,
-        );
+        return Product.fromJson(Map<String, dynamic>.from(json));
       }).toList();
     } catch (e) {
       print('Erro em getProducts: $e');
       throw Exception('Não foi possível carregar produtos');
+    }
+  }
+
+  Future<List<Product>> getProductsByCategory(String categoryId) async {
+    try {
+      final response = await _dio.get('/products/category/$categoryId');
+      return (response.data as List).map((json) {
+        return Product.fromJson(Map<String, dynamic>.from(json));
+      }).toList();
+    } catch (e) {
+      print('Erro em getProductsByCategory: $e');
+      throw Exception('Não foi possível carregar produtos da categoria');
     }
   }
 

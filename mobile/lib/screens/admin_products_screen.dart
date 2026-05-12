@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:convert';
 import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
@@ -35,6 +37,18 @@ BoxShadow _softShadow([double opacity = 0.08]) => BoxShadow(
       spreadRadius: -6,
       offset: const Offset(0, 16),
     );
+
+bool _looksLikeSvg(Uint8List bytes) {
+  final header = utf8.decode(bytes.take(200).toList(), allowMalformed: true).toLowerCase();
+  return header.contains('<svg');
+}
+
+Widget _buildImagePreview(Uint8List bytes, {BoxFit fit = BoxFit.cover}) {
+  if (_looksLikeSvg(bytes)) {
+    return SvgPicture.memory(bytes, fit: fit);
+  }
+  return Image.memory(bytes, fit: fit);
+}
 
 InputDecoration _prettyInput({
   required String label,
@@ -434,13 +448,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   }
 
   Widget _buildProductsTab(List<Product> products, List<Category> categories) {
+    // Debug filtragem detalhado
+    if (_selectedFilterCategoryId != null && products.isNotEmpty) {
+      final matchCount = products
+          .where((p) => p.categoryId.toLowerCase() == _selectedFilterCategoryId!.toLowerCase())
+          .length;
+      final uniqueIds = products.map((p) => p.categoryId).toSet().toList();
+      debugPrint('[AdminProducts] Filter: $_selectedFilterCategoryId | Matches: $matchCount / ${products.length}');
+      debugPrint('[AdminProducts] IDs únicos nos produtos: $uniqueIds');
+      debugPrint('[AdminProducts] Primeiro produto: name=${products.first.name}, categoryId=${products.first.categoryId}');
+    }
+
     final filteredProducts = products.where((p) {
       final matchesSearch =
           p.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      // Comparação case-insensitive para IDs (UUIDs podem ter variação de case)
       final matchesCat = _selectedFilterCategoryId == null ||
-          _selectedFilterCategoryId == p.categoryId;
+          (p.categoryId.isNotEmpty &&
+              p.categoryId.toLowerCase() == _selectedFilterCategoryId!.toLowerCase());
       final matchesSub = _selectedFilterSubcategoryId == null ||
-          _selectedFilterSubcategoryId == p.subcategoryId;
+          (p.subcategoryId?.isNotEmpty == true &&
+              p.subcategoryId!.toLowerCase() == _selectedFilterSubcategoryId!.toLowerCase());
       return matchesSearch && matchesCat && matchesSub;
     }).toList();
 
@@ -538,6 +566,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                           _selectedFilterSubcategoryId =
                               null; // reset subcategory filter
                         });
+                        // Fetch products for the selected category
+                        context.read<AdminProvider>().fetchProductsPage(
+                              refresh: true,
+                              categoryId: val,
+                              forceApiRefresh: true,
+                            );
                       },
                     ),
                   ),
@@ -1178,12 +1212,12 @@ final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
                                             color: _creamBg,
                                             borderRadius: BorderRadius.circular(10),
                                             border: Border.all(color: const Color(0xFFEADFD2)),
-                                            image: DecorationImage(
-                                              image: isNetwork
-                                                  ? NetworkImage(imgMap['url']) as ImageProvider
-                                                  : MemoryImage(imgMap['bytes']),
-                                              fit: BoxFit.cover,
-                                            ),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(9),
+                                            child: isNetwork
+                                                ? Image.network(imgMap['url'], fit: BoxFit.cover)
+                                                : _buildImagePreview(imgMap['bytes'], fit: BoxFit.cover),
                                           ),
                                         ),
                                         Positioned(
@@ -1642,7 +1676,7 @@ class _ImagePickerModalState extends State<_ImagePickerModal> {
                                       child: _selectedImageBytes != null
                                           ? ClipRRect(
                                               borderRadius: BorderRadius.circular(9),
-                                              child: Image.memory(_selectedImageBytes!, fit: BoxFit.cover),
+                                              child: _buildImagePreview(_selectedImageBytes!, fit: BoxFit.cover),
                                             )
                                           : _existingImageUrl != null && _existingImageUrl!.isNotEmpty
                                               ? ClipRRect(

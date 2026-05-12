@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../models/user_model.dart';
-import '../models/auth_response.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 

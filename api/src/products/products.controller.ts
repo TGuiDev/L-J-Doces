@@ -11,6 +11,11 @@ export class ProductsController {
     return this.productsService.getProducts();
   }
 
+  @Get('category/:categoryId')
+  async getProductsByCategory(@Param('categoryId') categoryId: string) {
+    return this.productsService.getProductsByCategory(categoryId);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post()
   async createProduct(@Body() body: any) {

@@ -18,7 +18,6 @@ import 'screens/signup_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/splash_screen.dart';
 import 'screens/admin_menu_screen.dart';
 import 'screens/admin_banners_screen.dart';
 import 'screens/admin_products_screen.dart';
@@ -31,11 +30,17 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    // ignore: avoid_print
+    print('⚠️  Aviso: Não foi possível carregar .env. Usando valores padrão.');
+  }
 
   try {
     await FirebaseService.initialize();
   } catch (e) {
+    // ignore: avoid_print
     print('⚠️  Aviso: Firebase não inicializado. Continuando sem Firebase.');
   }
 
@@ -43,7 +48,7 @@ void main() async {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -55,6 +60,7 @@ class _MyAppState extends State<MyApp> {
   late AdminProvider _adminProvider;
   late FavoritesProvider _favoritesProvider;
   late ApiService _apiService;
+  late SocketService _socketService;
   late Future<void> _initializationFuture;
 
   @override
@@ -80,20 +86,14 @@ class _MyAppState extends State<MyApp> {
     await _authProvider.init();
 
     // Inicializar Socket.io para real-time updates
-    final socketService = SocketService();
+    _socketService = SocketService();
     final backendUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
-    await socketService.initialize(backendUrl);
+    await _socketService.initialize(backendUrl);
   }
 
-  // void _handleIncomingLinks() {
-  //   // Desabilizado - causava erro ao tentar processar /admin como rota inicial
-  //   // O Flutter tenta usar platformDispatcher.defaultRouteName como rota inicial,
-  //   // mas isso causa conflito com rotas normais do app
-  // }
-
+  // ignore: unused_element
   void _handleDeepLink(Uri uri) {
     if (uri.scheme == 'lejdoces' && uri.path == '/reset-password') {
-      // Navegar para a tela de reset de senha
       navigatorKey.currentState?.pushNamed('/reset-password');
     }
   }
@@ -105,9 +105,6 @@ class _MyAppState extends State<MyApp> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           // Mostrar loading enquanto inicializa.
-          // Definir `initialRoute: '/'` aqui evita que o Flutter tente navegar
-          // para `platformDispatcher.defaultRouteName` (ex.: "/admin") antes
-          // das rotas estarem registradas na árvore principal.
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             onGenerateInitialRoutes: (_) => [
@@ -115,6 +112,30 @@ class _MyAppState extends State<MyApp> {
                 builder: (_) => const _LoadingScreen(),
               ),
             ],
+          );
+        }
+
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text('Erro ao inicializar aplicação'),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
@@ -128,7 +149,7 @@ class _MyAppState extends State<MyApp> {
             ChangeNotifierProvider(create: (_) => OrdersProvider(apiService: _apiService)),
             ChangeNotifierProvider(create: (_) => StockSyncProvider()),
             ChangeNotifierProvider(create: (_) => OrdersSyncProvider()),
-            ChangeNotifierProvider<SocketService>.value(value: SocketService()),
+            ChangeNotifierProvider<SocketService>.value(value: _socketService),
           ],
           child: MaterialApp(
             navigatorKey: navigatorKey,

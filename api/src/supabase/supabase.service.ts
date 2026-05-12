@@ -5,10 +5,16 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class SupabaseService {
   private supabase: SupabaseClient;
+  private supabaseUrl: string;
+  private supabaseAnonKey: string;
 
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
     const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseAnonKey = this.configService.get<string>('SUPABASE_ANON_KEY');
+
+    this.supabaseUrl = supabaseUrl;
+    this.supabaseAnonKey = supabaseAnonKey || supabaseKey;
 
     this.supabase = createClient(supabaseUrl, supabaseKey, {
       auth: {
@@ -22,19 +28,36 @@ export class SupabaseService {
     return this.supabase;
   }
 
+  private getAuthClient(): SupabaseClient {
+    // Cliente isolado para auth; evita sobrescrever sessão no cliente admin compartilhado.
+    return createClient(this.supabaseUrl, this.supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+  }
+
   async signUpWithEmail(email: string, password: string) {
     const { data, error } = await this.supabase.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
     });
     const dataAny = data as any;
     const finalUser = data?.user || (dataAny?.id ? dataAny : null);
     return { data: { user: finalUser } as any, error };
   }
 
+  async confirmUserEmail(userId: string) {
+    return await this.supabase.auth.admin.updateUserById(userId, {
+      email_confirm: true,
+    });
+  }
+
   async signInWithEmail(email: string, password: string) {
-    return await this.supabase.auth.signInWithPassword({
+    const authClient = this.getAuthClient();
+    return await authClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -61,12 +84,14 @@ export class SupabaseService {
   }
 
   async exchangeCodeForSession(code: string) {
-    return await this.supabase.auth.exchangeCodeForSession(code);
+    const authClient = this.getAuthClient();
+    return await authClient.auth.exchangeCodeForSession(code);
   }
 
   async signInWithIdToken(idToken: string) {
+    const authClient = this.getAuthClient();
     // Valida o ID token do Google diretamente com Supabase
-    const { data, error } = await this.supabase.auth.signInWithIdToken({
+    const { data, error } = await authClient.auth.signInWithIdToken({
       provider: 'google',
       token: idToken,
     });
@@ -74,8 +99,9 @@ export class SupabaseService {
   }
 
   async getUserByIdToken(idToken: string) {
+    const authClient = this.getAuthClient();
     // Tenta fazer login com ID token
-    const { data, error } = await this.supabase.auth.signInWithIdToken({
+    const { data, error } = await authClient.auth.signInWithIdToken({
       provider: 'google',
       token: idToken,
     });

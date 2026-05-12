@@ -16,7 +16,11 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
   String _dateFilter = 'all'; // 'all', '24h', '7d', 'custom'
+  String _statusFilter = 'all';
+  String _searchQuery = '';
   DateTimeRange? _customDateRange;
   String? _loadedToken;
   // Mantém referência para remover o listener
@@ -73,6 +77,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     try {
       _authProvider.removeListener(_onAuthChanged);
     } catch (_) {}
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -120,7 +125,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
           return orders
               .where((o) =>
                   o.createdAt.isAfter(_customDateRange!.start) &&
-                  o.createdAt.isBefore(_customDateRange!.end.add(const Duration(days: 1))))
+                  o.createdAt.isBefore(
+                      _customDateRange!.end.add(const Duration(days: 1))))
               .toList();
         }
         return orders;
@@ -153,125 +159,307 @@ class _OrdersScreenState extends State<OrdersScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Minhas Compras', style: TextStyle(color: Colors.black87)),
+        title: const Text('Minhas Compras',
+            style: TextStyle(color: Colors.black87)),
         leading: widget.showBackButton
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
+                icon:
+                    const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
                 onPressed: () => Navigator.maybePop(context),
               )
             : null,
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildDateFilterChip('Todos', 'all'),
-                  _buildDateFilterChip('24h', '24h'),
-                  _buildDateFilterChip('7 dias', '7d'),
-                  _buildDateFilterChip('Customizado', 'custom'),
-                  if (_dateFilter == 'custom' && _customDateRange != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Chip(
-                        label: Text(
-                          '${_customDateRange!.start.day}/${_customDateRange!.start.month} - ${_customDateRange!.end.day}/${_customDateRange!.end.month}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        onDeleted: () {
-                          setState(() {
-                            _customDateRange = null;
-                            _dateFilter = 'all';
-                          });
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
+          _buildSearchAndFilters(),
           Expanded(
             child: Consumer<OrdersProvider>(
-        builder: (context, ordersProvider, child) {
-          if (ordersProvider.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: Colors.orange),
-            );
-          }
+              builder: (context, ordersProvider, child) {
+                if (ordersProvider.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.orange),
+                  );
+                }
 
-          if (ordersProvider.error != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Erro: ${ordersProvider.error}'),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      final token = context.read<AuthProvider>().token;
-                      if (token != null) context.read<OrdersProvider>().fetchUserOrders(token);
-                    },
-                    child: const Text('Tentar novamente'),
-                  ),
-                ],
-              ),
-            );
-          }
+                if (ordersProvider.error != null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Erro: ${ordersProvider.error}'),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () {
+                            final token = context.read<AuthProvider>().token;
+                            if (token != null)
+                              context
+                                  .read<OrdersProvider>()
+                                  .fetchUserOrders(token);
+                          },
+                          child: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-          if (ordersProvider.orders.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Nenhuma compra realizada',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            );
-          }
+                if (ordersProvider.orders.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.shopping_bag_outlined,
+                            size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nenhuma compra realizada',
+                          style:
+                              TextStyle(fontSize: 16, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-          // Aplicar filtro de data
-          var orders = _applyDateFilter(ordersProvider.orders);
+                var orders = _applyFilters(ordersProvider.orders);
 
-          if (orders.isEmpty) {
-            return Center(
-              child: Text(
-                'Nenhuma compra encontrada neste período',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              ),
-            );
-          }
+                if (orders.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off_rounded,
+                            size: 72,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Nenhuma compra encontrada',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: orders.length,
-            itemBuilder: (context, index) {
-              final order = orders[index];
-              return _buildOrderCard(context, order);
-            },
-          );
-        },
-      ),
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final order = orders[index];
+                    return _buildOrderCard(context, order);
+                  },
+                );
+              },
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDateFilterChip(String label, String value) {
+  List<Order> _applyFilters(List<Order> orders) {
+    var filteredOrders = _applyDateFilter(orders);
+
+    filteredOrders = filteredOrders.where((order) {
+      final matchesStatus =
+          _statusFilter == 'all' || order.status.toLowerCase() == _statusFilter;
+
+      final search = _searchQuery.trim().toLowerCase();
+
+      final matchesSearch = search.isEmpty ||
+          order.id.toLowerCase().contains(search) ||
+          _getStatusLabel(order.status).toLowerCase().contains(search) ||
+          order.status.toLowerCase().contains(search) ||
+          order.totalAmount.toStringAsFixed(2).contains(search) ||
+          order.items.any((item) {
+            try {
+              final adminProvider = context.read<AdminProvider>();
+              final product = adminProvider.products.firstWhere(
+                (p) => p.id == item.productId,
+              );
+
+              return product.name.toLowerCase().contains(search);
+            } catch (_) {
+              return false;
+            }
+          });
+
+      return matchesStatus && matchesSearch;
+    }).toList();
+
+    return filteredOrders;
+  }
+
+  Widget _buildSearchAndFilters() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // SEARCH
+          Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: const Color(0xFFFFE5CC),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 7),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Buscar pedido...',
+                border: InputBorder.none,
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: Colors.orange,
+                ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () {
+                          _searchController.clear();
+
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          // PERÍODO
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'Período',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildDateFilterChip('Todos', 'all'),
+                _buildDateFilterChip('24h', '24h'),
+                _buildDateFilterChip('7 dias', '7d'),
+                _buildDateFilterChip('Customizado', 'custom'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // STATUS
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'Status',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                color: Colors.black54,
+              ),
+            ),
+          ),
+
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildStatusFilterChip(
+                  'Pendentes',
+                  'pending',
+                ),
+                _buildStatusFilterChip(
+                  'Confirmados',
+                  'confirmed',
+                ),
+                _buildStatusFilterChip(
+                  'Entregues',
+                  'delivered',
+                ),
+                _buildStatusFilterChip(
+                  'Cancelados',
+                  'cancelled',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusFilterChip(String label, String value) {
+    final selected = _statusFilter == value;
+
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
         label: Text(label),
-        selected: _dateFilter == value,
-        onSelected: (selected) {
+        selected: selected,
+        onSelected: (_) {
+          setState(() {
+            _statusFilter = selected ? 'all' : value;
+          });
+        },
+        selectedColor: Colors.orange,
+        backgroundColor: Colors.white,
+        checkmarkColor: Colors.white,
+        side: BorderSide(
+          color: selected ? Colors.orange : Colors.orange.withOpacity(0.22),
+        ),
+        labelStyle: TextStyle(
+          color: selected ? Colors.white : Colors.black87,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateFilterChip(String label, String value) {
+    final selected = _dateFilter == value;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) {
           if (value == 'custom') {
             _selectDateRange();
           } else {
@@ -282,9 +470,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
           }
         },
         selectedColor: Colors.orange,
+        backgroundColor: Colors.white,
+        checkmarkColor: Colors.white,
+        side: BorderSide(
+          color: selected ? Colors.orange : Colors.orange.withOpacity(0.22),
+        ),
         labelStyle: TextStyle(
-          color: _dateFilter == value ? Colors.white : Colors.black87,
-          fontWeight: FontWeight.w500,
+          color: selected ? Colors.white : Colors.black87,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -304,7 +497,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                 children: [
                   Text(
                     'Pedido #${order.id.length >= 8 ? order.id.substring(0, 8).toUpperCase() : order.id.toUpperCase()}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -395,7 +589,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
           String productName = 'Produto';
           try {
             final adminProvider = context.read<AdminProvider>();
-            final prod = adminProvider.products.firstWhere((p) => p.id == item.productId);
+            final prod = adminProvider.products
+                .firstWhere((p) => p.id == item.productId);
             productName = prod.name;
           } catch (_) {
             productName = 'Produto';
@@ -515,7 +710,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     children: [
                       Text(
                         _getStatusLabel(track.status),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       Text(
                         track.message,
@@ -543,7 +739,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12)),
+          Text(value,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w500, fontSize: 12)),
         ],
       ),
     );

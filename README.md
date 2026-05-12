@@ -1,12 +1,22 @@
- # 🍬 L&J Doces - Gestão Inteligente & Cardápio Digital
+# 🍬 L&J Doces - Gestão Inteligente & Cardápio Digital
 
+![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
 ![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![ODS 8](https://img.shields.io/badge/ODS%208-Trabalho%20Decente-A21942?style=for-the-badge)
 
-Aplicação móvel desenvolvida para modernizar a operação da microempresa **L&J Doces**, focando em eficiência operacional, sustentabilidade financeira e melhoria da experiência do cliente no ambiente universitário.
+Sistema completo desenvolvido para modernizar a operação da microempresa **L&J Doces** com dois componentes integrados: uma API em NestJS e um aplicativo Flutter. O foco é eficiência operacional, controle de estoque, vendas, consulta de cardápio em tempo real e apoio à decisão com dados e IA.
 
 ---
+
+## 📌 Visão Geral
+
+O projeto é organizado em duas camadas principais:
+
+1. **API (`api/`)**: backend em NestJS responsável por autenticação, usuários, produtos, categorias, pedidos, favoritos, banners, upload, analytics e tempo real.
+2. **App Mobile (`mobile/`)**: aplicativo Flutter para clientes e administração, com telas de acesso, consumo do cardápio, checkout, pedidos e gestão.
+
+Documentação central da arquitetura: [docs/visao-geral.md](docs/visao-geral.md)
 
 ## 👥 Equipe e Empresa
 * **Integrantes:**
@@ -30,81 +40,37 @@ Atualmente, a L&J Doces opera de forma presencial e manual. Isso gera:
 * Perda de tempo informando sabores e preços repetidamente aos alunos.
 
 ### 🎯 Solução Proposta
-Um aplicativo em **Flutter** estruturado em três pilares:
-1.  **Módulo de Gestão (Dono):** Controle total de estoque, vendas e cadastro.
-2.  **Módulo de Consulta (Cliente):** Cardápio digital em tempo real.
-3.  **Diferencial de IA:** Modelo preditivo para análise de tendências e sugestão de produção.
+Uma solução integrada estruturada em três pilares:
+1.  **Módulo de Gestão (Dono):** controle de estoque, vendas, banners, pedidos e acompanhamento operacional.
+2.  **Módulo de Consulta (Cliente):** cardápio digital em tempo real, favoritos, pedidos e checkout.
+3.  **Diferencial de IA e dados:** análise de tendências e resumo operacional para apoio à produção e tomada de decisão.
 
 ---
 
-## 🚀 Funcionalidades (Backlog Rascunho)
+## 🧱 Arquitetura Do Sistema
 
-### [Épico] Gestão de Inventário e Produtos
-- **RF-01:** Cadastro de produtos.
-- **RF-02:** Edição e exclusão de produtos.
-- **RF-05:** Alertas automáticos de estoque crítico.
+### Backend
 
-### [Épico] Experiência do Cliente
-- **RF-03:** Catálogo digital em tempo real para verificação de disponibilidade.
-- Sistema de fidelização digital
-- Pagamento via QR Code ou ChavePix.
+- **Framework:** NestJS
+- **Persistência/Integração:** Supabase
+- **Tempo real:** WebSockets / Socket.IO
+- **Upload de mídia:** Cloudinary
+- **Autenticação:** email/senha, Google OAuth e JWT
 
-### [Épico] Financeiro e Operacional
-- **RF-06:** Registro de vendas.
-- **RF-07:** Registro de vendas a prazo ("Penduricalhos").
-- **RF-08:** Cálculo automático de lucro real.
-- **RF-09:** Modo Offline com sincronização posterior.
+### Mobile
 
-### [Épico] Inteligência de Dados
-- **RF-10:** Modelo preditivo para análise de tendências e sugestão de produção diária.
+- **Framework:** Flutter
+- **Estado e integração:** Provider, serviços de API, storage local e Socket.IO
+- **Recursos complementares:** Firebase, Google Sign-In, QR Code, offline e sincronização
 
----
-
-## 📏 Regras de Negócio (RN)
-* **RN-01:** Produto sem estoque deve aparecer como indisponível no cardápio.
-* **RN-04:** Venda a prazo deve ter identificação do cliente e data prevista de pagamento.
-* **RN-05:** Toda venda finalizada deve atualizar automaticamente o saldo de estoque.
-* **RN-08:** Sugestão da IA é recomendação e exige confirmação do usuário.
-
----
-
-## ⚙️ Requisitos Não Funcionais (RNF)
-* **RNF-01:** Desenvolvimento obrigatório em framework Flutter.
-* **RNF-02:** Design responsivo para múltiplos dispositivos móveis.
-* **RNF-03:** Atualização de estoque/disponibilidade em até 2 segundos.
-* **RNF-05:** Operação offline sem perda de dados locais.
-* **RNF-06:** Proteção de dados com boas práticas e comunicação segura (HTTPS).
-
----
-
-## 🧪 Estratégia de Testes e Qualidade
-A qualidade do software será garantida através das seguintes camadas de teste:
-* **Testes Unitários:** Validação das funções lógicas de cálculo e estoque.
-* **Testes de Interface (Widget Tests):** Verificação da navegação e interatividade do cardápio.
-* **Ferramentas:** Uso do pacote nativo `flutter_test`.
-
----
-
-## 📚 Documentação de Requisitos e Colaboração
-- Requisitos Funcionais: `docs/RF.md`
-- Regras de Negócio: `docs/RN.md`
-- Requisitos Não Funcionais: `docs/RNF.md`
-- Guia de contribuição: `CONTRIBUTING.md`
-- Template de Pull Request: `.github/PULL_REQUEST_TEMPLATE.md`
-- Templates de Issue: `.github/ISSUE_TEMPLATE/`
-
----
-
-## 🛠️ Tecnologias Utilizadas
-* **Framework:** Flutter
-* **Linguagem:** Dart
 
 ---
 
 ## 📂 Documentação Técnica
-Clique nos links abaixo para explorar os detalhes técnicos e a organização do projeto:
+Clique nos links abaixo para explorar a documentação complementar do projeto:
 
-* [ Casos de Uso e Fluxos do MVP](docs/mvp.md)
-* [ Organograma do Projeto](docs/organograma.md)
-* [ Requisitos Funcionais](docs/RF.md)
-* [ Regras de Negócio](docs/RN.md)
+* [Visão geral do sistema](docs/visao-geral.md)
+* [Casos de Uso e Fluxos do MVP](docs/mvp.md)
+* [Organograma do Projeto](docs/organograma.md)
+* [Requisitos Funcionais](docs/RF.md)
+* [Regras de Negócio](docs/RN.md)

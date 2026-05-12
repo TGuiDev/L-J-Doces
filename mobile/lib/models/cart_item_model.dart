@@ -51,37 +51,13 @@ class CartItem {
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
       id: json['id'] as String,
-      product: Product(
-        id: json['product']['id'],
-        name: json['product']['name'],
-        description: json['product']['description'],
-        ingredients: json['product']['ingredients'],
-        price: (json['product']['price'] as num).toDouble(),
-        costPrice: (json['product']['costPrice'] as num).toDouble(),
-        images: List<String>.from(json['product']['images'] ?? []),
-        categoryId: json['product']['categoryId'],
-        subcategoryId: json['product']['subcategoryId'],
-        availableDays: Map<int, bool>.from(json['product']['availableDays'] ?? {}),
-        stockQuantity: json['product']['stockQuantity'],
-      ),
+      product: Product.fromJson(Map<String, dynamic>.from(json['product'] ?? {})),
       quantity: json['quantity'] as int,
       observation: json['observation'] as String? ?? '',
       addedAt: DateTime.tryParse(json['addedAt'] ?? '') ?? DateTime.now(),
       additions: json['additions'] != null
           ? (json['additions'] as List)
-              .map((e) => Product(
-                    id: e['id'],
-                    name: e['name'],
-                    description: e['description'],
-                    ingredients: e['ingredients'],
-                    price: (e['price'] as num).toDouble(),
-                    costPrice: (e['costPrice'] as num).toDouble(),
-                    images: List<String>.from(e['images'] ?? []),
-                    categoryId: e['categoryId'],
-                    subcategoryId: e['subcategoryId'],
-                    availableDays: Map<int, bool>.from(e['availableDays'] ?? {}),
-                    stockQuantity: e['stockQuantity'],
-                  ))
+              .map((e) => Product.fromJson(Map<String, dynamic>.from(e ?? {})))
               .toList()
           : null,
     );

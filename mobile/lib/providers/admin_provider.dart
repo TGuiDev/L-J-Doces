@@ -12,9 +12,12 @@ class AdminProvider with ChangeNotifier {
   List<Product> _products = [];
   List<Product> _allProducts = [];
   List<BannerModel> _banners = [];
-  bool _isLoading = false;
+  bool _isLoadingCategories = false;
+  bool _isLoadingProducts = false;
+  bool _isLoadingBanners = false;
   int _currentProductPage = 0;
   bool _hasMoreProducts = true;
+  int _productsRequestVersion = 0;
   static const int _productsPageSize = 12;
 
   AdminProvider({required ApiService apiService}) : _apiService = apiService;
@@ -22,19 +25,19 @@ class AdminProvider with ChangeNotifier {
   List<Category> get categories => _categories;
   List<Product> get products => _products;
   List<BannerModel> get banners => _banners;
-  bool get isLoading => _isLoading;
-  bool get isLoadingProducts => _isLoading;
+  bool get isLoading => _isLoadingCategories || _isLoadingBanners;
+  bool get isLoadingProducts => _isLoadingProducts;
   bool get hasMoreProducts => _hasMoreProducts;
 
   Future<void> fetchCategories() async {
-    _isLoading = true;
+    _isLoadingCategories = true;
     notifyListeners();
     try {
       _categories = await _apiService.getCategories();
     } catch (e) {
       print('Erro ao carregar categorias: $e');
     }
-    _isLoading = false;
+    _isLoadingCategories = false;
     notifyListeners();
   }
 
@@ -44,21 +47,39 @@ class AdminProvider with ChangeNotifier {
 
   Future<void> fetchProductsPage({
     bool refresh = false,
+    bool forceApiRefresh = false,
     String? categoryId,
     String? subcategoryId,
   }) async {
-    if (_isLoading && !refresh) return;
+    if (_isLoadingProducts && !refresh) return;
 
-    _isLoading = true;
+    final requestVersion = ++_productsRequestVersion;
+
+    _isLoadingProducts = true;
     notifyListeners();
     try {
-      if (refresh || _allProducts.isEmpty) {
-        _allProducts = await _apiService.getProducts();
+      // Load products from API if needed
+      if (forceApiRefresh || _allProducts.isEmpty) {
+        if (categoryId != null) {
+          // Se há filtro de categoria, buscar apenas dessa categoria
+          _allProducts = await _apiService.getProductsByCategory(categoryId);
+        } else {
+          // Se não há filtro, buscar todos os produtos
+          _allProducts = await _apiService.getProducts();
+        }
+      }
+
+      if (requestVersion != _productsRequestVersion) {
+        return;
+      }
+
+      if (refresh) {
         _currentProductPage = 0;
         _hasMoreProducts = true;
         _products = [];
       }
 
+      // Filter products locally (if needed)
       final filteredProducts = _allProducts.where((product) {
         final matchesCategory =
             categoryId == null || product.categoryId == categoryId;
@@ -87,9 +108,16 @@ class AdminProvider with ChangeNotifier {
       _hasMoreProducts = endIndex < filteredProducts.length;
     } catch (e) {
       print('Erro ao carregar produtos: $e');
+      if (refresh) {
+        _products = [];
+        _hasMoreProducts = false;
+      }
+    } finally {
+      if (requestVersion == _productsRequestVersion) {
+        _isLoadingProducts = false;
+        notifyListeners();
+      }
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<bool> createCategory(Category category) async {
@@ -241,7 +269,7 @@ class AdminProvider with ChangeNotifier {
   }
 
   Future<void> fetchBanners() async {
-    _isLoading = true;
+    _isLoadingBanners = true;
     notifyListeners();
     try {
       final data = await _apiService.getBanners();
@@ -249,40 +277,40 @@ class AdminProvider with ChangeNotifier {
     } catch (e) {
       print('Erro ao carregar banners: $e');
     }
-    _isLoading = false;
+    _isLoadingBanners = false;
     notifyListeners();
   }
 
   Future<bool> createBanner(String token, String imageUrl, bool active) async {
-    _isLoading = true;
+    _isLoadingBanners = true;
     notifyListeners();
     try {
       final response = await _apiService.createBanner(token, imageUrl, active);
       final newBanner = BannerModel.fromJson(response);
       _banners.insert(0, newBanner);
-      _isLoading = false;
+      _isLoadingBanners = false;
       notifyListeners();
       return true;
     } catch (e) {
       print('Erro ao adicionar banner: $e');
-      _isLoading = false;
+      _isLoadingBanners = false;
       notifyListeners();
       return false;
     }
   }
 
   Future<bool> deleteBanner(String token, String id) async {
-    _isLoading = true;
+    _isLoadingBanners = true;
     notifyListeners();
     try {
       await _apiService.deleteBanner(token, id);
       _banners.removeWhere((b) => b.id == id);
-      _isLoading = false;
+      _isLoadingBanners = false;
       notifyListeners();
       return true;
     } catch (e) {
       print('Erro ao remover banner: $e');
-      _isLoading = false;
+      _isLoadingBanners = false;
       notifyListeners();
       return false;
     }

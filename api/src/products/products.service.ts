@@ -7,7 +7,23 @@ export class ProductsService {
 
   async getProducts() {
     const client = this.supabase.getClient();
-    const { data, error } = await client.from('products').select(`*, category:categories(name), subcategory:subcategories(name)`);
+    const { data, error } = await client
+      .from('products')
+      .select(
+        `id, name, description, price, images, category_id, subcategory_id, stock_quantity, created_at, category:categories(id, name), subcategory:subcategories(id, name)`
+      );
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async getProductsByCategory(categoryId: string) {
+    const client = this.supabase.getClient();
+    const { data, error } = await client
+      .from('products')
+      .select(
+        `id, name, description, price, images, category_id, subcategory_id, stock_quantity, created_at, category:categories(id, name), subcategory:subcategories(id, name)`
+      )
+      .eq('category_id', categoryId);
     if (error) throw new BadRequestException(error.message);
     return data;
   }

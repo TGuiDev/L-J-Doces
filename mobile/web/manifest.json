@@ -1,0 +1,35 @@
+{
+    "name": "L&J Doces e Salgados",
+    "short_name": "L&J Doces",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0175C2",
+    "theme_color": "#0175C2",
+    "description": "Meu Novo Projeto em Flutter.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.svg",
+            "sizes": "192x192",
+            "type": "image/svg"
+        },
+        {
+            "src": "icons/Icon-512.svg",
+            "sizes": "512x512",
+            "type": "image/svg"
+        },
+        {
+            "src": "icons/Icon-maskable-192.svg",
+            "sizes": "192x192",
+            "type": "image/svg",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.svg",
+            "sizes": "512x512",
+            "type": "image/svg",
+            "purpose": "maskable"
+        }
+    ]
+}

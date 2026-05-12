@@ -433,6 +433,7 @@ class _ProductScreenState extends State<ProductScreen> {
                       ),
                     ),
                   const SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   const Text(
                     'Descrição',
                     style: TextStyle(

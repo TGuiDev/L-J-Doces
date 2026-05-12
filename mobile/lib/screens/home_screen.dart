@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -7,6 +8,7 @@ import '../providers/favorites_provider.dart';
 import '../models/category_model.dart';
 import '../models/product_model.dart';
 import '../widgets/favorite_icon.dart';
+import '../widgets/profile_image_widget.dart';
 import 'cart_screen.dart';
 import 'product_screen.dart';
 import 'orders_screen.dart';
@@ -85,9 +87,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _homeScrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   int _currentIndex = 0;
   String? _selectedCategoryId;
+  String? _previousCategoryId;
+  String _searchQuery = '';
+  bool _showFavoritesOnly = false;
+
+  bool _isSvgUrl(String? url) {
+    if (url == null || url.isEmpty) return false;
+    final lower = url.toLowerCase();
+    return lower.contains('.svg') || lower.contains('/svg?');
+  }
+
   String? _selectedSubcategoryId;
 
   @override
@@ -103,6 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       adminProvider.fetchProductsPage(
         refresh: true,
+        forceApiRefresh: true,
         categoryId: _selectedCategoryId,
         subcategoryId: _selectedSubcategoryId,
       );
@@ -119,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _homeScrollController.removeListener(_onScroll);
     _homeScrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -141,9 +156,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _reloadProducts() {
+  void _reloadProducts({bool forceApiRefresh = false}) {
     context.read<AdminProvider>().fetchProductsPage(
           refresh: true,
+          forceApiRefresh: forceApiRefresh,
           categoryId: _selectedCategoryId,
           subcategoryId: _selectedSubcategoryId,
         );
@@ -338,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return RefreshIndicator(
       color: const Color(0xFFFF7A00),
       onRefresh: () async {
-        _reloadProducts();
+        _reloadProducts(forceApiRefresh: true);
       },
       child: CustomScrollView(
         controller: _homeScrollController,
@@ -347,18 +363,18 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(
             child: _buildHeroBanner(),
           ),
-
           SliverToBoxAdapter(
             child: _buildQuickActions(),
           ),
-
+          SliverToBoxAdapter(
+            child: _buildSearchBox(),
+          ),
           SliverToBoxAdapter(
             child: _buildSectionHeader(
               title: 'Categorias',
               subtitle: 'Filtre pelo que você está procurando',
             ),
           ),
-
           if (adminProvider.isLoading && categories.isEmpty)
             SliverToBoxAdapter(
               child: _buildCategorySkeleton(),
@@ -367,13 +383,11 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: _buildCategories(categories),
             ),
-
           if (currentSelectedCategory != null &&
               currentSelectedCategory.subcategories.isNotEmpty)
             SliverToBoxAdapter(
               child: _buildSubcategories(currentSelectedCategory),
             ),
-
           SliverToBoxAdapter(
             child: _buildSectionHeader(
               title: _selectedCategoryId == null
@@ -382,54 +396,10 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: 'Carregando aos poucos para ficar mais rápido',
             ),
           ),
-
-          if (adminProvider.isLoadingProducts && products.isEmpty)
-            _buildProductSkeletonGrid()
-          else if (products.isEmpty)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(
-                  child: Text(
-                    'Nenhum produto encontrado',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            _buildProductSliverGrid(products),
-
-          if (adminProvider.isLoadingProducts && products.isNotEmpty)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 28),
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFFFF7A00),
-                  ),
-                ),
-              ),
-            ),
-
-          if (!adminProvider.hasMoreProducts && products.isNotEmpty)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(24, 8, 24, 34),
-                child: Center(
-                  child: Text(
-                    'Você chegou ao fim da lista',
-                    style: TextStyle(
-                      color: Colors.black45,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          ..._buildFilteredProductsSlivers(
+            products: products,
+            adminProvider: adminProvider,
+          ),
         ],
       ),
     );
@@ -603,6 +573,100 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildSearchBox() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+      child: Container(
+        height: 58,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: const Color(0xFFFFE5CC),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: TextField(
+          controller: _searchController,
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value.toLowerCase();
+            });
+          },
+          style: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1F1F1F),
+          ),
+          decoration: InputDecoration(
+            hintText: 'Buscar doces, bolos...',
+            hintStyle: TextStyle(
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+            border: InputBorder.none,
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Container(
+                margin: const EdgeInsets.all(8),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E6),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.search_rounded,
+                  color: Color(0xFFFF7A00),
+                  size: 22,
+                ),
+              ),
+            ),
+            suffixIcon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      key: const ValueKey('clear'),
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: Colors.black54,
+                        ),
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                    )
+                  : const SizedBox(width: 12),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 18,
+              horizontal: 4,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionHeader({
     required String title,
     required String subtitle,
@@ -685,10 +749,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 18),
-        itemCount: categories.length + 1,
+        itemCount: categories.length + 2,
         itemBuilder: (context, index) {
           if (index == 0) {
-            final isSelected = _selectedCategoryId == null;
+            final isSelected =
+                _selectedCategoryId == null && !_showFavoritesOnly;
 
             return _CategoryCard(
               title: 'Todos',
@@ -697,16 +762,39 @@ class _HomeScreenState extends State<HomeScreen> {
               isSelected: isSelected,
               onTap: () {
                 setState(() {
+                  _showFavoritesOnly = false;
+                  _previousCategoryId = null;
                   _selectedCategoryId = null;
                   _selectedSubcategoryId = null;
                 });
-                _reloadProducts();
+
+                _reloadProducts(forceApiRefresh: true);
               },
             );
           }
 
-          final category = categories[index - 1];
-          final isSelected = _selectedCategoryId == category.id;
+          if (index == 1) {
+            return _CategoryCard(
+              title: 'Favoritos',
+              imageUrl: null,
+              icon: Icons.favorite_rounded,
+              iconColor: const Color(0xFFFF4D6D),
+              isSelected: _showFavoritesOnly,
+              onTap: () {
+                setState(() {
+                  _previousCategoryId = _selectedCategoryId;
+                  _showFavoritesOnly = true;
+                  _selectedCategoryId = null;
+                  _selectedSubcategoryId = null;
+                });
+                _reloadProducts(forceApiRefresh: true);
+              },
+            );
+          }
+
+          final category = categories[index - 2];
+          final isSelected =
+              _selectedCategoryId == category.id && !_showFavoritesOnly;
 
           return _CategoryCard(
             title: category.name,
@@ -715,9 +803,11 @@ class _HomeScreenState extends State<HomeScreen> {
             isSelected: isSelected,
             onTap: () {
               setState(() {
+                _showFavoritesOnly = false;
                 _selectedCategoryId = category.id;
                 _selectedSubcategoryId = null;
               });
+
               _reloadProducts();
             },
           );
@@ -759,10 +849,158 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildFilteredProductsSlivers({
+    required List<Product> products,
+    required AdminProvider adminProvider,
+  }) {
+    final favoritesProvider = context.watch<FavoritesProvider>();
+    final favoriteIds = favoritesProvider.favoriteProductIds.toSet();
+
+    // Apply search filter and favorites filter
+    final filteredProducts = products.where((product) {
+      final matchesSearch = _searchQuery.isEmpty ||
+          product.name.toLowerCase().contains(_searchQuery) ||
+          product.description.toLowerCase().contains(_searchQuery);
+
+      final matchesFavorites =
+          !_showFavoritesOnly || favoriteIds.contains(product.id);
+
+      return matchesSearch && matchesFavorites;
+    }).toList();
+
+    final List<Widget> slivers = [];
+
+    if (adminProvider.isLoadingProducts && products.isEmpty) {
+      slivers.add(_buildProductSkeletonGrid());
+    } else if (filteredProducts.isEmpty) {
+      slivers.add(
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(
+              child: Text(
+                'Nenhum produto encontrado',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      slivers.add(_buildProductSliverGrid(filteredProducts));
+
+      if (adminProvider.isLoadingProducts && products.isNotEmpty) {
+        slivers.add(
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF7A00),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      if (!adminProvider.hasMoreProducts && products.isNotEmpty) {
+        slivers.add(
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 34),
+              child: Center(
+                child: Text(
+                  'Você chegou ao fim da lista',
+                  style: TextStyle(
+                    color: Colors.black45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return slivers;
+  }
+
+  Widget _buildFilteredProductsSliver({
+    required List<Product> products,
+    required AdminProvider adminProvider,
+  }) {
+    final favoritesProvider = context.watch<FavoritesProvider>();
+    final favoriteIds = favoritesProvider.favoriteProductIds.toSet();
+
+    // Apply search filter and favorites filter
+    final filteredProducts = products.where((product) {
+      final matchesSearch = _searchQuery.isEmpty ||
+          product.name.toLowerCase().contains(_searchQuery) ||
+          product.description.toLowerCase().contains(_searchQuery);
+
+      final matchesFavorites =
+          !_showFavoritesOnly || favoriteIds.contains(product.id);
+
+      return matchesSearch && matchesFavorites;
+    }).toList();
+
+    if (adminProvider.isLoadingProducts && products.isEmpty) {
+      return _buildProductSkeletonGrid();
+    } else if (filteredProducts.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(
+            child: Text(
+              'Nenhum produto encontrado',
+              style: TextStyle(
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      return SliverList(
+        delegate: SliverChildListDelegate([
+          _buildProductSliverGrid(filteredProducts),
+          if (adminProvider.isLoadingProducts && products.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF7A00),
+                ),
+              ),
+            ),
+          if (!adminProvider.hasMoreProducts && products.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 8, 24, 34),
+              child: Center(
+                child: Text(
+                  'Você chegou ao fim da lista',
+                  style: TextStyle(
+                    color: Colors.black45,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      );
+    }
   }
 
   Widget _buildProductSliverGrid(List<Product> products) {
@@ -851,10 +1089,10 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icon(Icons.receipt_long_outlined),
           label: 'Compras',
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings_outlined),
-          label: 'Ajustes',
-        ),
+        // BottomNavigationBarItem(
+        //   icon: Icon(Icons.settings_outlined),
+        //   label: 'Ajustes',
+        // ),
       ],
     );
   }
@@ -904,20 +1142,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Row(
                         children: [
-                          CircleAvatar(
+                          ProfileImageWidget(
+                            imageUrl: authProvider.user!.picture,
                             radius: 31,
-                            backgroundColor:
-                                const Color(0xFFFF7A00).withOpacity(0.16),
-                            backgroundImage: authProvider.user!.picture != null
-                                ? NetworkImage(authProvider.user!.picture!)
-                                : null,
-                            child: authProvider.user!.picture == null
-                                ? const Icon(
-                                    Icons.person_rounded,
-                                    size: 32,
-                                    color: Color(0xFFFF7A00),
-                                  )
-                                : null,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -1119,6 +1346,7 @@ class _CategoryCard extends StatelessWidget {
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
+  final Color? iconColor;
 
   const _CategoryCard({
     required this.title,
@@ -1126,6 +1354,7 @@ class _CategoryCard extends StatelessWidget {
     required this.icon,
     required this.isSelected,
     required this.onTap,
+    this.iconColor,
   });
 
   @override
@@ -1196,8 +1425,7 @@ class _CategoryCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                color:
-                    isSelected ? const Color(0xFFFF7A00) : Colors.black87,
+                color: isSelected ? const Color(0xFFFF7A00) : Colors.black87,
               ),
             ),
           ],
@@ -1220,6 +1448,12 @@ class _SubcategoryChip extends StatelessWidget {
     this.imageUrl,
   });
 
+  bool _isSvgUrl(String? url) {
+    if (url == null || url.isEmpty) return false;
+    final lower = url.toLowerCase();
+    return lower.contains('.svg') || lower.contains('/svg?');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChoiceChip(
@@ -1235,7 +1469,18 @@ class _SubcategoryChip extends StatelessWidget {
       ),
       avatar: imageUrl != null && imageUrl!.isNotEmpty
           ? CircleAvatar(
-              backgroundImage: NetworkImage(imageUrl!),
+              backgroundImage:
+                  !_isSvgUrl(imageUrl) ? NetworkImage(imageUrl!) : null,
+              child: _isSvgUrl(imageUrl)
+                  ? ClipOval(
+                      child: SvgPicture.network(
+                        imageUrl!,
+                        width: 24,
+                        height: 24,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : null,
             )
           : null,
       label: Text(

@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Widget para exibir imagens de perfil com cache otimizado
 /// Trata erros de rate limit (429) e oferece fallback gracioso
@@ -20,10 +21,27 @@ class ProfileImageWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = radius * 2;
+    final isSvg = imageUrl != null &&
+        imageUrl!.isNotEmpty &&
+        (imageUrl!.toLowerCase().contains('.svg') || imageUrl!.toLowerCase().contains('/svg?'));
 
     Widget imageWidget;
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
+      if (isSvg) {
+        imageWidget = SvgPicture.network(
+          imageUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          placeholderBuilder: (context) => Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      } else {
       imageWidget = CachedNetworkImage(
         imageUrl: imageUrl!,
         fit: BoxFit.cover,
@@ -59,6 +77,7 @@ class ProfileImageWidget extends StatelessWidget {
         fadeInDuration: const Duration(milliseconds: 300),
         fadeOutDuration: const Duration(milliseconds: 300),
       );
+      }
     } else {
       imageWidget = Container(
         color: Colors.grey[300],

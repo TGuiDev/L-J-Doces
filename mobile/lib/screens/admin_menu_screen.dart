@@ -70,7 +70,7 @@ class AdminMenuScreen extends StatelessWidget {
           children: [
             _buildMenuCard(context, 'Pedidos', Icons.shopping_bag_outlined, '/admin/orders'),
             _buildMenuCard(context, 'Produtos', Icons.inventory_2_outlined, '/admin/products'),
-            _buildMenuCard(context, 'Banners', Icons.view_carousel_outlined, '/admin/banners'),
+            // _buildMenuCard(context, 'Banners', Icons.view_carousel_outlined, '/admin/banners'),
             _buildMenuCard(context, 'Vendas', Icons.attach_money, '/admin/sales'),
             _buildMenuCard(context, 'Resumo Operacional', Icons.analytics_outlined, '/admin/analytics'),
           ],

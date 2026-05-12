@@ -3,8 +3,8 @@
 ## Metadados
 - Projeto: **L&J Doces**
 - Produto: Aplicativo móvel de gestão e cardápio digital
-- Versão do documento: `1.0.0`
-- Última atualização: `2026-03-04`
+- Versão do documento: `1.1.0`
+- Última atualização: `2026-05-12`
 
 ## Objetivo
 Descrever as funcionalidades obrigatórias do sistema para atender às necessidades operacionais da L&J Doces e da experiência dos clientes.
@@ -23,6 +23,17 @@ Descrever as funcionalidades obrigatórias do sistema para atender às necessida
 | RF-08 | Cálculo de Lucro | O sistema deve calcular lucro por produto e por período com base em custo e receita. | Média | Proposto |
 | RF-09 | Modo Offline com Sincronização | O sistema deve permitir registro de operações sem internet e sincronizar dados quando a conexão retornar. | Alta | Proposto |
 | RF-10 | Sugestão de Produção (IA) | O sistema deve sugerir volume de produção diária com base no histórico de vendas. | Média | Proposto |
+| RF-11 | Autenticação de Usuário | O sistema deve permitir cadastro, login por email/senha e login social com Google. | Alta | Proposto |
+| RF-12 | Recuperação de Acesso | O sistema deve permitir reenviar confirmação de email, solicitar reset e atualizar senha. | Alta | Proposto |
+| RF-13 | Perfil do Usuário | O sistema deve permitir consultar e atualizar perfil com nome, foto, telefone e senha. | Média | Proposto |
+| RF-14 | Gestão de Categorias e Subcategorias | O sistema deve permitir CRUD e ordenação de categorias/subcategorias no módulo administrativo. | Alta | Proposto |
+| RF-15 | Gestão de Favoritos | O sistema deve permitir adicionar e remover produtos favoritos por usuário autenticado. | Média | Proposto |
+| RF-16 | Gestão de Banners Promocionais | O sistema deve permitir cadastrar e remover banners com upload de imagem e status ativo. | Média | Proposto |
+| RF-17 | Checkout e Criação de Pedidos | O sistema deve permitir criar pedido a partir do carrinho com itens, quantidade e valor total. | Alta | Proposto |
+| RF-18 | Acompanhamento e Administração de Pedidos | O sistema deve permitir listar pedidos, consultar detalhes e atualizar status (usuário e admin). | Alta | Proposto |
+| RF-19 | Resumo Operacional e Analytics | O sistema deve apresentar resumo operacional e indicadores com filtros de período. | Média | Proposto |
+| RF-20 | Atualização em Tempo Real | O sistema deve sincronizar eventos de estoque, pedidos e vendas em tempo real via WebSocket. | Alta | Proposto |
+| RF-21 | Deep Link de Redefinição de Senha | O app deve abrir a tela de redefinição ao receber link `lejdoces://reset-password`. | Média | Proposto |
 
 ## Critérios Gerais de Aceite
 - Cada RF deve possuir evidência de implementação (tela, endpoint, teste ou demonstração).
@@ -32,4 +43,5 @@ Descrever as funcionalidades obrigatórias do sistema para atender às necessida
 ## Histórico de Alterações
 | Data | Versão | Alteração | Responsável |
 |---|---|---|---|
+| 2026-05-12 | 1.1.0 | Inclusão de RF-11 a RF-21 com base nas funcionalidades mapeadas no mobile. | Equipe L&J Doces |
 | 2026-03-04 | 1.0.0 | Criação inicial do documento. | Equipe L&J Doces |
