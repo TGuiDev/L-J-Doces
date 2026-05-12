@@ -30,20 +30,6 @@ import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await dotenv.load(fileName: '.env');
-  } catch (e) {
-    // ignore: avoid_print
-    print('⚠️  Aviso: Não foi possível carregar .env. Usando valores padrão.');
-  }
-
-  try {
-    await FirebaseService.initialize();
-  } catch (e) {
-    // ignore: avoid_print
-    print('⚠️  Aviso: Firebase não inicializado. Continuando sem Firebase.');
-  }
-
   runApp(const MyApp());
 }
 
@@ -72,6 +58,20 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initializeProviders() async {
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (e) {
+      // ignore: avoid_print
+      print('Aviso: Nao foi possivel carregar .env. Usando valores padrao.');
+    }
+
+    try {
+      await FirebaseService.initialize();
+    } catch (e) {
+      // ignore: avoid_print
+      print('Aviso: Firebase nao inicializado. Continuando sem Firebase.');
+    }
+
     final storageService = StorageService();
     _apiService = ApiService();
 
@@ -107,6 +107,8 @@ class _MyAppState extends State<MyApp> {
           // Mostrar loading enquanto inicializa.
           return MaterialApp(
             debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            themeMode: ThemeMode.light,
             onGenerateInitialRoutes: (_) => [
               MaterialPageRoute(
                 builder: (_) => const _LoadingScreen(),
@@ -292,6 +294,7 @@ class _LoadingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
+      backgroundColor: Colors.white,
       body: Center(
         child: CircularProgressIndicator(),
       ),
