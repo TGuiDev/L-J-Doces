@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Administrador
+actor IA
+rectangle "UC12 - Receber sugestao de producao por IA" {
+  usecase "Consolidar historico" as Historico
+  usecase "Processar analise" as Analise
+  usecase "Exibir recomendacao" as Recomendacao
+  usecase "Confirmar decisao humana" as Confirmacao
+}
+Administrador --> Historico
+IA --> Analise
+Historico --> Analise
+Analise --> Recomendacao
+Recomendacao .> Confirmacao : <<include>>
+@enduml

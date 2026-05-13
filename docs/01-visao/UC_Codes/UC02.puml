@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Cliente
+rectangle "UC02 - Autenticar e recuperar acesso" {
+  usecase "Cadastrar conta" as Cadastro
+  usecase "Entrar com email/senha" as LoginEmail
+  usecase "Entrar com Google" as LoginGoogle
+  usecase "Recuperar acesso" as Reset
+  usecase "Abrir tela pelo deep link" as DeepLink
+}
+Cliente --> Cadastro
+Cliente --> LoginEmail
+Cliente --> LoginGoogle
+Cliente --> Reset
+Reset .> DeepLink : <<include>>
+@enduml

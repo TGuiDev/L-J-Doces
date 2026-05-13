@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Administrador
+rectangle "UC09 - Administrar banners e destaques" {
+  usecase "Validar sessao" as Sessao
+  usecase "Cadastrar banner" as Cadastrar
+  usecase "Definir ativo/inativo" as Status
+  usecase "Publicar destaque" as Publicar
+  usecase "Ocultar banner inativo" as Ocultar
+}
+Administrador --> Cadastrar
+Cadastrar .> Sessao : <<include>>
+Cadastrar --> Status
+Status --> Publicar
+Status .> Ocultar : <<extend>>
+@enduml

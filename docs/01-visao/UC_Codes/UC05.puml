@@ -1,0 +1,17 @@
+@startuml
+left to right direction
+actor Administrador
+rectangle "UC05 - Controlar estoque e alertas" {
+  usecase "Registrar entrada" as Entrada
+  usecase "Registrar saida" as Saida
+  usecase "Recalcular saldo" as Saldo
+  usecase "Validar estoque" as Estoque
+  usecase "Emitir alerta de minimo" as Alerta
+}
+Administrador --> Entrada
+Administrador --> Saida
+Entrada .> Saldo : <<include>>
+Saida .> Saldo : <<include>>
+Saldo .> Estoque : <<include>>
+Estoque .> Alerta : <<extend>>
+@enduml

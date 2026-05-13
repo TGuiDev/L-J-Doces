@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Sistema
+rectangle "UC08 - Operar offline e sincronizar" {
+  usecase "Gravar dados localmente" as Local
+  usecase "Detectar reconexao" as Reconexao
+  usecase "Sincronizar eventos" as Sync
+  usecase "Resolver conflitos" as Conflitos
+  usecase "Confirmar consistencia" as Consistencia
+}
+Sistema --> Local
+Local --> Reconexao
+Reconexao --> Sync
+Sync .> Conflitos : <<include>>
+Conflitos --> Consistencia
+@enduml

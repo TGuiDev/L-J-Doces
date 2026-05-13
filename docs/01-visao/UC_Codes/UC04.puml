@@ -1,0 +1,19 @@
+@startuml
+left to right direction
+actor Administrador
+rectangle "UC04 - Gerenciar catalogo e categorias" {
+  usecase "Validar sessao" as Sessao
+  usecase "Criar produto" as Criar
+  usecase "Editar produto" as Editar
+  usecase "Inativar produto" as Inativar
+  usecase "Manter categorias\ne ordenacao" as Categorias
+}
+Administrador --> Criar
+Administrador --> Editar
+Administrador --> Inativar
+Administrador --> Categorias
+Criar .> Sessao : <<include>>
+Editar .> Sessao : <<include>>
+Inativar .> Sessao : <<include>>
+Categorias .> Sessao : <<include>>
+@enduml

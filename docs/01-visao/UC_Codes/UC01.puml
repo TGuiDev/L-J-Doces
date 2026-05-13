@@ -1,0 +1,14 @@
+@startuml
+left to right direction
+actor Cliente
+rectangle "UC01 - Consultar catalogo em tempo real" {
+  usecase "Abrir app" as Abrir
+  usecase "Carregar catalogo" as Catalogo
+  usecase "Exibir preco e disponibilidade" as Disponibilidade
+  usecase "Marcar produto sem estoque\ncomo indisponivel" as SemEstoque
+}
+Cliente --> Abrir
+Abrir --> Catalogo
+Catalogo --> Disponibilidade
+Disponibilidade .> SemEstoque : <<include>>
+@enduml

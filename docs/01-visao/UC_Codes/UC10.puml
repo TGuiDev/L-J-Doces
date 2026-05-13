@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Administrador
+rectangle "UC10 - Consultar resumo e analytics" {
+  usecase "Validar sessao" as Sessao
+  usecase "Selecionar periodo" as Periodo
+  usecase "Carregar metricas" as Metricas
+  usecase "Analisar desempenho" as Analise
+  usecase "Receber sugestao\nde producao por IA" as IA
+}
+Administrador --> Periodo
+Periodo .> Sessao : <<include>>
+Periodo --> Metricas
+Metricas --> Analise
+Analise .> IA : <<extend>>
+@enduml

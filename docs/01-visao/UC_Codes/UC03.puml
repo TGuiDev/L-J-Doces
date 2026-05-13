@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Cliente
+rectangle "UC03 - Gerenciar perfil e favoritos" {
+  usecase "Validar sessao" as Sessao
+  usecase "Atualizar perfil" as Perfil
+  usecase "Marcar favorito" as Marcar
+  usecase "Desmarcar favorito" as Desmarcar
+}
+Cliente --> Perfil
+Cliente --> Marcar
+Cliente --> Desmarcar
+Perfil .> Sessao : <<include>>
+Marcar .> Sessao : <<include>>
+Desmarcar .> Sessao : <<include>>
+@enduml

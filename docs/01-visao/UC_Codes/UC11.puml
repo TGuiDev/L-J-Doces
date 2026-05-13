@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Sistema
+rectangle "UC11 - Receber atualizacoes por websocket" {
+  usecase "Conectar socket" as Socket
+  usecase "Inscrever eventos" as Eventos
+  usecase "Sincronizar eventos" as Sync
+  usecase "Atualizar interface" as Interface
+  usecase "Restaurar assinaturas\napos reconexao" as Restaurar
+}
+Sistema --> Socket
+Socket --> Eventos
+Eventos .> Sync : <<include>>
+Sync --> Interface
+Socket .> Restaurar : <<extend>>
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+left to right direction
+actor Administrador
+rectangle "UC06 - Registrar vendas e penduricalhos" {
+  usecase "Selecionar itens" as Itens
+  usecase "Validar disponibilidade" as Disponibilidade
+  usecase "Registrar forma de pagamento" as Pagamento
+  usecase "Identificar cliente" as Cliente
+  usecase "Finalizar venda" as Finalizar
+}
+Administrador --> Itens
+Itens --> Disponibilidade
+Disponibilidade --> Pagamento
+Pagamento --> Finalizar
+Pagamento .> Cliente : <<extend>>\npenduricalho
+@enduml

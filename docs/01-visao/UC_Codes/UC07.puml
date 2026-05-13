@@ -1,0 +1,19 @@
+@startuml
+left to right direction
+actor Cliente
+rectangle "UC07 - Checkout e pedidos" {
+  usecase "Validar sessao" as Sessao
+  usecase "Montar carrinho" as Carrinho
+  usecase "Validar quantidade" as Quantidade
+  usecase "Validar estoque" as Estoque
+  usecase "Confirmar checkout" as Checkout
+  usecase "Consultar historico" as Historico
+}
+Cliente --> Carrinho
+Cliente --> Historico
+Carrinho --> Quantidade
+Quantidade .> Estoque : <<include>>
+Checkout .> Sessao : <<include>>
+Quantidade --> Checkout
+Historico .> Sessao : <<include>>
+@enduml
