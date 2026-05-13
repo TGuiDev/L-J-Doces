@@ -154,8 +154,9 @@ flutter build web
 ## Documentacao relacionada
 
 - README raiz: [README.md](../README.md)
-- Visao geral: [visao-geral.md](../docs/visao-geral.md)
-- Requisitos funcionais: [docs/RF.md](../docs/RF.md)
-- Regras de negocio: [docs/RN.md](../docs/RN.md)
-- Requisitos nao funcionais: [docs/RNF.md](../docs/RNF.md)
-- MVP: [docs/mvp.md](../docs/mvp.md)
+- Hub de documentação: [docs/README.md](../docs/README.md)
+- Visao geral: [docs/01-visao/visao-geral.md](../docs/01-visao/visao-geral.md)
+- Requisitos funcionais: [docs/02-requisitos/RF.md](../docs/02-requisitos/RF.md)
+- Regras de negocio: [docs/02-requisitos/RN.md](../docs/02-requisitos/RN.md)
+- Requisitos nao funcionais: [docs/02-requisitos/RNF.md](../docs/02-requisitos/RNF.md)
+- MVP: [docs/01-visao/mvp.md](../docs/01-visao/mvp.md)

@@ -105,11 +105,11 @@ Consolidar os casos de uso essenciais do MVP, cobrindo jornada do cliente, opera
 
 ## Relacao com a Documentacao
 
-- Requisitos funcionais: [RF.md](RF.md)
-- Regras de negocio: [RN.md](RN.md)
-- Requisitos nao funcionais: [RNF.md](RNF.md)
-- Organograma de responsabilidades: [organograma.md](organograma.md)
-- Visao geral: [visao-geral.md](visao-geral.md)
+- Requisitos funcionais: [RF.md](../02-requisitos/RF.md)
+- Regras de negocio: [RN.md](../02-requisitos/RN.md)
+- Requisitos nao funcionais: [RNF.md](../02-requisitos/RNF.md)
+- Organograma de responsabilidades: [organograma.md](../03-processo/organograma.md)
+- Visao geral: [visao-geral.md](./visao-geral.md)
 
 ## Historico de Alteracoes
 

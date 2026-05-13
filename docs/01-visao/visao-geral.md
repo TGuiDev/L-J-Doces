@@ -105,13 +105,13 @@ O app usa `.env` com a URL da API e outras chaves de execução local.
 
 ## Documentação Relacionada
 
-- [Visão geral no README raiz](../README.md)
-- [Documentação de requisitos](README.md)
-- [Requisitos funcionais](RF.md)
-- [Regras de negócio](RN.md)
-- [Requisitos não funcionais](RNF.md)
-- [MVP e casos de uso](mvp.md)
-- [Organograma do projeto](organograma.md)
+- [Visão geral no README raiz](../../README.md)
+- [Hub de documentação](../README.md)
+- [Requisitos funcionais](../02-requisitos/RF.md)
+- [Regras de negócio](../02-requisitos/RN.md)
+- [Requisitos não funcionais](../02-requisitos/RNF.md)
+- [MVP e casos de uso](./mvp.md)
+- [Organograma do projeto](../03-processo/organograma.md)
 
 ## Próximos Passos
 

@@ -1,0 +1,94 @@
+@startuml
+title L&J Doces - Diagrama de Atividade (Checkout e Ciclo do Pedido)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam backgroundColor #FCFCFA
+skinparam activity {
+  BackgroundColor #FFF8E8
+  BorderColor #8D5A00
+  ArrowColor #555555
+  DiamondBackgroundColor #FFEFD1
+}
+
+start
+
+partition "Cliente (App Mobile)" {
+  :Selecionar produtos e quantidades;
+  :Confirmar checkout;
+}
+
+partition "API" {
+  :Receber requisicao de criacao de pedido;
+  :Validar sessao (RN-10);
+}
+
+if (Sessao valida?) then (sim)
+  partition "API" {
+    :Validar itens e total do carrinho (RN-14);
+  }
+else (nao)
+  partition "Cliente (App Mobile)" {
+    :Exibir erro de autenticacao;
+    :Redirecionar para login;
+  }
+  stop
+endif
+
+partition "API + Banco" {
+  :Consultar estoque dos produtos;
+}
+
+if (Estoque suficiente?) then (sim)
+  partition "API + Banco" {
+    :Persistir pedido com status RECEBIDO;
+    :Debitar estoque (RN-05);
+  }
+
+  partition "Tempo Real" {
+    :Emitir evento order.created;
+    :Notificar app admin e cliente;
+  }
+
+  partition "Cliente (App Mobile)" {
+    :Exibir confirmacao do pedido;
+  }
+else (nao)
+  partition "Cliente (App Mobile)" {
+    :Exibir item indisponivel/quantidade invalida;
+    :Permitir ajuste do carrinho (RN-11);
+  }
+  stop
+endif
+
+partition "Administrador" {
+  :Visualizar novo pedido;
+  :Atualizar status para EM_PREPARO;
+}
+
+partition "API + Banco" {
+  :Persistir alteracao de status;
+}
+
+partition "Tempo Real" {
+  :Emitir evento order.status.updated;
+}
+
+partition "Cliente (App Mobile)" {
+  :Atualizar timeline do pedido;
+}
+
+partition "Administrador" {
+  :Atualizar para PRONTO/ENTREGUE;
+}
+
+partition "Tempo Real" {
+  :Publicar status final;
+}
+
+partition "Cliente (App Mobile)" {
+  :Exibir pedido concluido;
+}
+
+stop
+@enduml

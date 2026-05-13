@@ -16,7 +16,7 @@ O projeto é organizado em duas camadas principais:
 1. **API (`api/`)**: backend em NestJS responsável por autenticação, usuários, produtos, categorias, pedidos, favoritos, banners, upload, analytics e tempo real.
 2. **App Mobile (`mobile/`)**: aplicativo Flutter para clientes e administração, com telas de acesso, consumo do cardápio, checkout, pedidos e gestão.
 
-Documentação central da arquitetura: [docs/visao-geral.md](docs/visao-geral.md)
+Documentação central da arquitetura: [docs/01-visao/visao-geral.md](docs/01-visao/visao-geral.md)
 
 ## 👥 Equipe e Empresa
 * **Integrantes:**
@@ -69,8 +69,11 @@ Uma solução integrada estruturada em três pilares:
 ## 📂 Documentação Técnica
 Clique nos links abaixo para explorar a documentação complementar do projeto:
 
-* [Visão geral do sistema](docs/visao-geral.md)
-* [Casos de Uso e Fluxos do MVP](docs/mvp.md)
-* [Organograma do Projeto](docs/organograma.md)
-* [Requisitos Funcionais](docs/RF.md)
-* [Regras de Negócio](docs/RN.md)
+* [Hub de documentação](docs/README.md)
+* [Visão geral do sistema](docs/01-visao/visao-geral.md)
+* [Casos de uso e fluxos do MVP](docs/01-visao/mvp.md)
+* [Organograma do projeto](docs/03-processo/organograma.md)
+* [Requisitos funcionais](docs/02-requisitos/RF.md)
+* [Regras de negócio](docs/02-requisitos/RN.md)
+* [Requisitos não funcionais](docs/02-requisitos/RNF.md)
+* [Diagramas PUML](docs/05-arquitetura/diagramas/README.md)

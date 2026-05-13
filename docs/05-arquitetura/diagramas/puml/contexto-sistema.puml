@@ -1,0 +1,57 @@
+@startuml
+title L&J Doces - Contexto do Sistema (C1)
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam backgroundColor #FBFBF8
+skinparam ArrowColor #5A5A5A
+skinparam RectangleBorderColor #454545
+skinparam RectangleBackgroundColor #FFF8EC
+skinparam RectangleFontColor #1F1F1F
+skinparam rectangle<<externo>> {
+	BackgroundColor #EAF3FF
+	BorderColor #4A77A8
+}
+skinparam rectangle<<interno>> {
+	BackgroundColor #FFF2D9
+	BorderColor #AF6A00
+}
+
+actor "Cliente" as cliente
+actor "Administrador" as admin
+
+rectangle "Plataforma L&J Doces" as lj <<interno>> {
+	rectangle "App Mobile\nFlutter" as mobile <<interno>>
+	rectangle "API L&J Doces\nNestJS" as api <<interno>>
+}
+
+rectangle "Supabase\nAuth + Postgres" as supabase <<externo>>
+rectangle "Cloudinary\nMídia de Produtos" as cloudinary <<externo>>
+rectangle "Google Identity\nOAuth 2.0" as google <<externo>>
+
+cliente --> mobile : consulta catálogo\ncria pedido\nacompanha status
+admin --> mobile : mantém catálogo\nacompanha pedidos\nanalisa indicadores
+
+mobile --> api : HTTPS/JSON
+mobile <--> api : WebSocket\natualizações em tempo real
+api --> supabase : persistência\ne autenticação
+api --> cloudinary : upload e URL pública
+mobile --> google : login social
+api --> google : validação de token Google
+
+note right of api
+Responsabilidades centrais:
+- Regras de negócio (RN)
+- Controle de acesso (JWT)
+- Orquestração de pedidos e estoque
+end note
+
+legend right
+|= Tipo |= Papel |
+| Interno | Componentes mantidos pela equipe L&J |
+| Externo | Serviços de terceiros integrados |
+endlegend
+
+@enduml

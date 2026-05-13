@@ -142,6 +142,7 @@ src/
 
 ## Links úteis
 
-- Visão geral: [docs/visao-geral.md](../docs/visao-geral.md)
-- MVP / Casos de uso: [docs/mvp.md](../docs/mvp.md)
-- RF / RN / RNF: [docs/RF.md](../docs/RF.md), [docs/RN.md](../docs/RN.md), [docs/RNF.md](../docs/RNF.md)
+- Hub de documentação: [docs/README.md](../docs/README.md)
+- Visão geral: [docs/01-visao/visao-geral.md](../docs/01-visao/visao-geral.md)
+- MVP / Casos de uso: [docs/01-visao/mvp.md](../docs/01-visao/mvp.md)
+- RF / RN / RNF: [docs/02-requisitos/RF.md](../docs/02-requisitos/RF.md), [docs/02-requisitos/RN.md](../docs/02-requisitos/RN.md), [docs/02-requisitos/RNF.md](../docs/02-requisitos/RNF.md)

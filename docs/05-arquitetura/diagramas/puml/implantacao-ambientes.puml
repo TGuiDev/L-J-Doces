@@ -1,0 +1,56 @@
+@startuml
+title L&J Doces - Visão de Implantação (Dev e Produção)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam backgroundColor #FCFCFA
+skinparam ArrowColor #505050
+skinparam node {
+  BorderColor #666666
+  BackgroundColor #F7F7F3
+}
+skinparam database {
+  BorderColor #4C77A6
+  BackgroundColor #EAF3FF
+}
+skinparam cloud {
+  BorderColor #5C7FA8
+  BackgroundColor #EEF5FF
+}
+
+left to right direction
+
+node "Ambiente Local (Dev)" {
+  node "Mobile Flutter\nflutter run" as dev_mobile
+  node "API NestJS\nnpm run start:dev" as dev_api
+}
+
+cloud "Serviços Compartilhados" {
+  database "Supabase\nAuth + Postgres" as supabase
+  cloud "Cloudinary" as cloudinary
+  cloud "Google OAuth" as oauth
+}
+
+node "Ambiente Produção" {
+  node "App Mobile Publicado\n(Android/iOS)" as prod_mobile
+  node "API Deploy\n(App Service/Container)" as prod_api
+}
+
+dev_mobile --> dev_api : HTTP local
+prod_mobile --> prod_api : HTTPS público
+
+dev_api --> supabase : CRUD + Auth
+prod_api --> supabase : CRUD + Auth
+
+dev_api --> cloudinary : upload de mídia
+prod_api --> cloudinary : upload de mídia
+
+dev_api --> oauth : validação social
+prod_api --> oauth : validação social
+
+note bottom
+Objetivo: evidenciar que DEV e PROD compartilham integrações externas,
+mas com runtimes e endpoints distintos.
+end note
+
+@enduml

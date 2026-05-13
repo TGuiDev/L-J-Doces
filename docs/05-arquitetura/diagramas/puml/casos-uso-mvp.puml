@@ -1,0 +1,100 @@
+@startuml
+title L&J Doces - Diagrama de Casos de Uso (MVP)
+left to right direction
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+skinparam backgroundColor #FCFCFA
+skinparam actorStyle awesome
+skinparam linetype ortho
+skinparam usecase {
+  BackgroundColor #FFF8E8
+  BorderColor #8D5A00
+  ArrowColor #555555
+}
+
+actor "Cliente" as Cliente
+actor "Administrador" as Admin
+actor "Sistema" as Sistema
+actor "IA" as IA
+
+rectangle "L&J Doces - Plataforma" {
+  package "1) Jornada do Cliente" {
+    usecase "UC01 Consultar\nCatalogo em Tempo Real" as UC01
+    usecase "UC02 Autenticar e\nRecuperar Acesso" as UC02
+    usecase "UC03 Gerenciar\nPerfil e Favoritos" as UC03
+    usecase "UC07 Checkout\ne Pedidos" as UC07
+  }
+
+  package "2) Jornada Administrativa" {
+    usecase "UC04 Gerenciar\nCatalogo e Categorias" as UC04
+    usecase "UC05 Controlar\nEstoque e Alertas" as UC05
+    usecase "UC06 Registrar Vendas\ne Penduricalhos" as UC06
+    usecase "UC09 Administrar\nBanners e Destaques" as UC09
+    usecase "UC10 Consultar\nResumo e Analytics" as UC10
+  }
+
+  package "3) Capacidades Transversais" {
+    usecase "UC08 Operar Offline\ne Sincronizar" as UC08
+    usecase "UC11 Receber Atualizacoes\npor WebSocket" as UC11
+    usecase "UC12 Receber Sugestao\nde Producao por IA" as UC12
+  }
+
+  package "4) Regras Compartilhadas" {
+    usecase "Validar Sessao" as Auth
+    usecase "Validar Estoque" as Stock
+    usecase "Sincronizar Eventos" as Sync
+  }
+}
+
+Cliente --> UC01
+Cliente --> UC02
+Cliente --> UC03
+Cliente --> UC07
+
+Admin --> UC04
+Admin --> UC05
+Admin --> UC06
+Admin --> UC09
+Admin --> UC10
+Admin --> UC12
+
+Sistema --> UC08
+Sistema --> UC11
+IA --> UC12
+
+' Links ocultos para travar posicionamento e reduzir sobreposição visual
+UC01 -[hidden]-> UC04
+UC04 -[hidden]-> UC08
+UC08 -[hidden]-> Auth
+Auth -[hidden]-> Stock
+Stock -[hidden]-> Sync
+
+UC03 .> Auth : <<include>>
+UC04 .> Auth : <<include>>
+UC07 .> Auth : <<include>>
+UC09 .> Auth : <<include>>
+UC10 .> Auth : <<include>>
+
+UC07 .> Stock : <<include>>
+UC05 .> Stock : <<include>>
+
+UC08 .> Sync : <<include>>
+UC11 .> Sync : <<include>>
+UC10 .> UC12 : <<extend>>
+
+note bottom
+Referencias principais: UC01-UC12 em docs/01-visao/mvp.md
+e regras RN-01 a RN-16 em docs/02-requisitos/RN.md.
+end note
+
+note right of Auth
+Para reduzir poluicao visual,
+nem todos os includes repetidos
+foram desenhados.
+As regras continuam valendo
+para os demais casos aplicaveis.
+end note
+
+@enduml

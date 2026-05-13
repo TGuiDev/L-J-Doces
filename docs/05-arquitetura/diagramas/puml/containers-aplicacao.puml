@@ -1,0 +1,62 @@
+@startuml
+title L&J Doces - Containers e Integrações (C2)
+
+left to right direction
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam backgroundColor #FCFCFA
+skinparam ArrowColor #575757
+skinparam PackageBorderColor #7A7A7A
+skinparam PackageBackgroundColor #F8F8F5
+skinparam ComponentBackgroundColor #FFF9EA
+skinparam ComponentBorderColor #AA6A00
+skinparam DatabaseBackgroundColor #EAF3FF
+skinparam DatabaseBorderColor #4C77A6
+
+actor "Cliente" as cliente
+actor "Administrador" as admin
+
+package "Dispositivo do Usuário" {
+  component "App Mobile\nFlutter" as app
+}
+
+node "Backend L&J (NestJS)" {
+  component "API REST\nControllers + Services" as api
+  component "Gateway WebSocket\nPedidos/Estoque" as ws
+  component "Módulo Analytics\nIA + Agregações" as analytics
+}
+
+package "Serviços Externos" {
+  database "Supabase\nPostgres + Auth" as db
+  component "Storage de Imagens\nCloudinary" as cloud
+  component "Google Identity\nOAuth" as oauth
+}
+
+cliente --> app : jornada de compra
+admin --> app : jornada administrativa
+
+app --> api : HTTPS/JSON\n(auth, catálogo, pedidos)
+app <--> ws : WebSocket\n(eventos em tempo real)
+
+api --> db : SQL via SDK Supabase\n(CRUD e sessão)
+api --> cloud : upload/listagem\nde imagens
+api --> oauth : validação de\nlogin social
+
+analytics --> db : leitura histórica\n(vendas, pedidos)
+api --> analytics : resumo operacional\ne insights
+ws --> db : leitura de estado\nde pedidos/estoque
+
+note bottom of app
+No mobile, Provider centraliza estado
+e reatividade de telas cliente/admin.
+end note
+
+legend bottom
+|= Comunicação |= Uso |
+| HTTPS/JSON | Operações transacionais e CRUD |
+| WebSocket | Atualização de status em tempo real |
+| OAuth 2.0 | Autenticação social Google |
+endlegend
+
+@enduml

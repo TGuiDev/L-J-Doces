@@ -23,12 +23,12 @@
 
 ## Vinculos com Documentacao
 
-- Requisitos funcionais: [docs/RF.md](docs/RF.md)
-- Regras de negocio: [docs/RN.md](docs/RN.md)
-- Requisitos nao funcionais: [docs/RNF.md](docs/RNF.md)
-- Escopo e casos de uso do MVP: [docs/mvp.md](docs/mvp.md)
-- Visao geral da solucao: [docs/visao-geral.md](docs/visao-geral.md)
-- Apresentacao principal: [README.md](README.md)
+- Requisitos funcionais: [02-requisitos/RF.md](../02-requisitos/RF.md)
+- Regras de negocio: [02-requisitos/RN.md](../02-requisitos/RN.md)
+- Requisitos nao funcionais: [02-requisitos/RNF.md](../02-requisitos/RNF.md)
+- Escopo e casos de uso do MVP: [01-visao/mvp.md](../01-visao/mvp.md)
+- Visao geral da solucao: [01-visao/visao-geral.md](../01-visao/visao-geral.md)
+- Apresentacao principal: [README.md](../../README.md)
 
 ## Historico de Alteracoes
 

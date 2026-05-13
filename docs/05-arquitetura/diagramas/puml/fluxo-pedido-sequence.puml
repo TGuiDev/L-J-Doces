@@ -1,0 +1,75 @@
+@startuml
+title L&J Doces - Fluxo de Pedido (Sequência Detalhada)
+
+autonumber
+skinparam shadowing false
+skinparam sequence {
+	ArrowColor #4D4D4D
+	LifeLineBorderColor #6E6E6E
+	LifeLineBackgroundColor #FCFCF8
+	ParticipantBorderColor #6E6E6E
+	ParticipantBackgroundColor #FFF8E8
+	DatabaseBorderColor #4C77A6
+	DatabaseBackgroundColor #EAF3FF
+}
+
+actor Cliente
+participant "App Mobile (Cliente/Admin)" as App
+actor "Administrador" as Admin
+participant "API NestJS" as API
+database "Supabase" as DB
+participant "Gateway WebSocket" as WS
+
+Cliente -> App : Monta carrinho e confirma checkout
+App -> API : POST /orders (itens, total, endereço)
+activate API
+
+API -> DB : Validar estoque por item
+DB --> API : Estoque atual
+
+alt Estoque insuficiente
+	API --> App : 409 Conflict\nitem indisponível/quantidade inválida
+	App --> Cliente : Solicita ajuste do carrinho
+else Estoque válido
+	API -> DB : Inserir pedido (status=recebido)
+	API -> DB : Debitar estoque
+	DB --> API : Pedido criado + saldo atualizado
+
+	API -> WS : Emitir evento order.created
+	WS --> App : Atualiza fila de pedidos (view admin)
+	API --> App : 201 Created + pedido
+	App --> Cliente : Pedido confirmado
+end
+deactivate API
+
+== Ciclo de status administrativo ==
+
+Admin -> App : Solicita alteração de status (em_preparo)
+App -> API : PUT /orders/:id/status (em_preparo)
+activate API
+API -> DB : Atualizar status
+DB --> API : OK
+API -> WS : Emitir order.status.updated
+WS --> App : Notifica novo status
+deactivate API
+
+App --> Cliente : Exibe status "em preparo"
+
+Admin -> App : Solicita alteração de status (pronto/entregue)
+App -> API : PUT /orders/:id/status (pronto/entregue)
+activate API
+API -> DB : Persistir transição final
+DB --> API : OK
+API -> WS : Emitir status final
+WS --> App : Sincroniza timeline do pedido
+API --> App : 200 OK
+deactivate API
+
+App --> Cliente : Exibe pedido concluído
+
+note over API,DB
+Regra crítica: criação de pedido e baixa de estoque
+devem ocorrer de forma consistente.
+end note
+
+@enduml
