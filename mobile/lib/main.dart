@@ -26,6 +26,7 @@ import 'screens/admin_orders_screen.dart';
 import 'screens/analytics_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/orders_screen.dart';
+import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -104,16 +105,11 @@ class _MyAppState extends State<MyApp> {
       future: _initializationFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // Mostrar loading enquanto inicializa.
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             themeMode: ThemeMode.light,
-            onGenerateInitialRoutes: (_) => [
-              MaterialPageRoute(
-                builder: (_) => const _LoadingScreen(),
-              ),
-            ],
+            home: const SplashScreen(),
           );
         }
 
@@ -172,17 +168,10 @@ class _MyAppState extends State<MyApp> {
             locale: const Locale('pt', 'BR'),
             home: Consumer<AuthProvider>(
               builder: (context, authProvider, _) {
-                // Mostrar splash screen enquanto carrega
                 if (authProvider.isLoading) {
-                  // Substituído pela tela de carregamento simples
-                  return const Scaffold(
-                    body: Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
+                  return const SplashScreen();
                 }
 
-                // O aplicativo sempre iniciará na HomeScreen agora
                 return const HomeScreen();
               },
             ),
@@ -284,20 +273,6 @@ class _MyAppState extends State<MyApp> {
           ),
         );
       },
-    );
-  }
-}
-
-class _LoadingScreen extends StatelessWidget {
-  const _LoadingScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
     );
   }
 }

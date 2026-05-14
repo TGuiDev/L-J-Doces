@@ -6,6 +6,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/auth_response.dart';
 
 class ApiService {
+  static const String connectionWarning =
+      'Sem conexao com a internet. Verifique sua rede e tente novamente.';
+
   late Dio _dio;
   late String _baseUrl;
 
@@ -51,6 +54,36 @@ class ApiService {
     _dio.options.headers.remove('Authorization');
   }
 
+  static bool isConnectionError(Object error) {
+    if (error is DioException) {
+      return error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.response == null;
+    }
+
+    final message = error.toString().toLowerCase();
+    return message.contains('failed host lookup') ||
+        message.contains('xmlhttprequest') ||
+        message.contains('connection') ||
+        message.contains('network') ||
+        message.contains('socket') ||
+        message.contains('timeout');
+  }
+
+  static String friendlyErrorMessage(
+    Object error, {
+    String fallback = 'Nao foi possivel concluir a acao. Tente novamente.',
+  }) {
+    if (isConnectionError(error)) {
+      return connectionWarning;
+    }
+
+    final rawMessage = error.toString().replaceFirst('Exception: ', '').trim();
+    return rawMessage.isEmpty ? fallback : rawMessage;
+  }
+
   // Auth endpoints
   Future<AuthResponse> signUp({
     required String name,
@@ -78,8 +111,9 @@ class ApiService {
 
       return AuthResponse.fromJson(response.data);
     } on DioException catch (e) {
-      final errorMessage =
-          e.response?.data['message'] ?? e.message ?? 'Erro desconhecido';
+      final errorMessage = isConnectionError(e)
+          ? connectionWarning
+          : e.response?.data['message'] ?? e.message ?? 'Erro desconhecido';
       final errorData = e.response?.data;
 
       print('[API] DioException ao fazer signup');
@@ -98,7 +132,7 @@ class ApiService {
 
       return AuthResponse(
         success: false,
-        error: 'Erro ao registrar: $e',
+        error: friendlyErrorMessage(e, fallback: 'Erro ao registrar'),
       );
     }
   }
@@ -119,7 +153,9 @@ class ApiService {
     } on DioException catch (e) {
       return AuthResponse(
         success: false,
-        error: e.response?.data['message'] ?? 'Erro ao fazer login',
+        error: isConnectionError(e)
+            ? connectionWarning
+            : e.response?.data['message'] ?? 'Erro ao fazer login',
       );
     }
   }
@@ -152,10 +188,12 @@ class ApiService {
 
       return authResponse;
     } on DioException catch (e) {
-      final errorMessage = e.response?.data['message'] ??
-          e.response?.data['error'] ??
-          e.message ??
-          'Erro desconhecido';
+      final errorMessage = isConnectionError(e)
+          ? connectionWarning
+          : e.response?.data['message'] ??
+              e.response?.data['error'] ??
+              e.message ??
+              'Erro desconhecido';
       final errorData = e.response?.data;
 
       print('[API.GoogleAuth] DioException ao fazer Google Auth');
@@ -173,7 +211,10 @@ class ApiService {
 
       return AuthResponse(
         success: false,
-        error: 'Erro ao autenticar com Google: $e',
+        error: friendlyErrorMessage(
+          e,
+          fallback: 'Erro ao autenticar com Google',
+        ),
       );
     }
   }
@@ -308,6 +349,18 @@ class ApiService {
     } catch (e) {
       print('Erro em getProducts: $e');
       throw Exception('Não foi possível carregar produtos');
+    }
+  }
+
+  Future<List<Product>> getTopOrderedProducts() async {
+    try {
+      final response = await _dio.get('/products/top-ordered');
+      return (response.data as List).map((json) {
+        return Product.fromJson(Map<String, dynamic>.from(json));
+      }).toList();
+    } catch (e) {
+      print('Erro em getTopOrderedProducts: $e');
+      throw Exception('Nao foi possivel carregar produtos mais pedidos');
     }
   }
 
@@ -504,7 +557,7 @@ class ApiService {
       return response.data;
     } catch (e) {
       print('ApiService.get error on $path: $e');
-      rethrow;
+      throw Exception(friendlyErrorMessage(e));
     }
   }
 
@@ -521,7 +574,7 @@ class ApiService {
       return response.data;
     } catch (e) {
       print('ApiService.post error on $path: $e');
-      rethrow;
+      throw Exception(friendlyErrorMessage(e));
     }
   }
 
@@ -538,7 +591,7 @@ class ApiService {
       return response.data;
     } catch (e) {
       print('ApiService.put error on $path: $e');
-      rethrow;
+      throw Exception(friendlyErrorMessage(e));
     }
   }
 
@@ -551,7 +604,7 @@ class ApiService {
       await _dio.delete(path, options: options);
     } catch (e) {
       print('ApiService.delete error on $path: $e');
-      rethrow;
+      throw Exception(friendlyErrorMessage(e));
     }
   }
 
@@ -582,13 +635,62 @@ class ApiService {
       print('ApiService.getOperationalSummary Dio error: ${e.response?.data}');
 
       throw Exception(
-        e.response?.data?['message'] ??
-            e.response?.data?['error'] ??
-            'Erro ao gerar resumo operacional',
+        isConnectionError(e)
+            ? connectionWarning
+            : e.response?.data?['message'] ??
+                e.response?.data?['error'] ??
+                'Erro ao gerar resumo operacional',
       );
     } catch (e) {
       print('ApiService.getOperationalSummary error: $e');
-      rethrow;
+      throw Exception(friendlyErrorMessage(e));
+    }
+  }
+
+  Future<ProductAnalytics> getProductAnalytics({
+    String? token,
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final params = <String, dynamic>{};
+
+      if (startDate != null) {
+        params['startDate'] = startDate;
+      }
+
+      if (endDate != null) {
+        params['endDate'] = endDate;
+      }
+
+      final options = token != null
+          ? Options(headers: {'Authorization': 'Bearer $token'})
+          : null;
+
+      final response = await _dio.get(
+        '/analytics/products',
+        queryParameters: params,
+        options: options,
+      );
+
+      final payload = response.data;
+      final data = payload is Map<String, dynamic>
+          ? Map<String, dynamic>.from(payload['data'] ?? payload)
+          : <String, dynamic>{};
+
+      return ProductAnalytics.fromJson(data);
+    } on DioException catch (e) {
+      print('ApiService.getProductAnalytics Dio error: ${e.response?.data}');
+      throw Exception(
+        isConnectionError(e)
+            ? connectionWarning
+            : e.response?.data?['message'] ??
+                e.response?.data?['error'] ??
+                'Erro ao obter produtos mais vendidos',
+      );
+    } catch (e) {
+      print('ApiService.getProductAnalytics error: $e');
+      throw Exception(friendlyErrorMessage(e));
     }
   }
 }

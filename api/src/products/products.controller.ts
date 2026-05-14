@@ -11,6 +11,11 @@ export class ProductsController {
     return this.productsService.getProducts();
   }
 
+  @Get('top-ordered')
+  async getTopOrderedProducts() {
+    return this.productsService.getTopOrderedProducts(10);
+  }
+
   @Get('category/:categoryId')
   async getProductsByCategory(@Param('categoryId') categoryId: string) {
     return this.productsService.getProductsByCategory(categoryId);

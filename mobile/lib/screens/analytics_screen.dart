@@ -113,8 +113,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         selectedTab = 0;
       });
     } catch (e) {
+      final friendlyMessage = ApiService.friendlyErrorMessage(
+        e,
+        fallback: 'Não foi possível gerar o resumo. Tente novamente.',
+      );
       setState(() {
-        error = 'Erro ao gerar resumo: ${e.toString()}';
+        error = friendlyMessage;
         isLoading = false;
       });
       // ignore: use_build_context_synchronously

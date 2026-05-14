@@ -1,0 +1,117 @@
+@startuml
+title L&J Doces - Diagrama de Classes do Pedido
+left to right direction
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam backgroundColor #FCFCFA
+skinparam class {
+  BackgroundColor #FFF8E8
+  BorderColor #8D5A00
+  ArrowColor #555555
+}
+skinparam enum {
+  BackgroundColor #EAF3FF
+  BorderColor #4B78A8
+}
+hide empty methods
+
+class Cliente {
+  +id: UUID
+  +nome: string
+  +email: string
+}
+
+class Pedido {
+  +id: UUID
+  +status: StatusPedido
+  +valorTotal: decimal
+  +estoqueBaixadoEm: datetime
+  +criadoEm: datetime
+  +atualizadoEm: datetime
+}
+
+class ItemPedido {
+  +id: UUID
+  +quantidade: int
+  +precoUnitario: decimal
+  +observacao: string
+}
+
+class Produto {
+  +id: UUID
+  +nome: string
+  +preco: decimal
+  +quantidadeEstoque: int
+}
+
+class Pagamento {
+  +id: UUID
+  +valor: decimal
+  +metodo: string
+  +status: StatusPagamento
+  +pagoEm: datetime
+}
+
+class RastreamentoPedido {
+  +id: UUID
+  +status: StatusPedido
+  +mensagem: string
+  +criadoEm: datetime
+}
+
+class MovimentacaoEstoque {
+  +id: UUID
+  +tipo: TipoMovimento
+  +quantidade: int
+  +estoqueAntes: int
+  +estoqueDepois: int
+  +motivo: string
+}
+
+enum StatusPedido {
+  pendente
+  recebido
+  em_preparo
+  pronto
+  entregue
+  cancelado
+}
+
+enum StatusPagamento {
+  pendente
+  concluido
+  cancelado
+}
+
+enum TipoMovimento {
+  entrada
+  saida
+  ajuste
+}
+
+Cliente "1" -- "0..*" Pedido : realiza >
+Pedido "1" *-- "1..*" ItemPedido : contem >
+ItemPedido "*" --> "1" Produto : referencia >
+Pedido "1" -- "0..*" Pagamento : possui >
+Pedido "1" -- "1..*" RastreamentoPedido : acompanha >
+Pedido "1" -- "0..*" MovimentacaoEstoque : gera >
+Produto "1" -- "0..*" MovimentacaoEstoque : movimenta >
+
+Pedido ..> StatusPedido
+Pagamento ..> StatusPagamento
+MovimentacaoEstoque ..> TipoMovimento
+
+note right of Pedido
+Classe central da compra.
+Guarda status, total e datas
+importantes do ciclo do pedido.
+end note
+
+note bottom of ItemPedido
+Cada item liga o pedido ao produto,
+registrando quantidade, preco do momento
+e observacoes do cliente.
+end note
+
+@enduml

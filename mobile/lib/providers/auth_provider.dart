@@ -111,7 +111,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       print('[AuthProvider] Exceção ao fazer signup: $e');
       print('[AuthProvider] Stack: ${StackTrace.current}');
-      _error = 'Erro: ${e.toString()}';
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -156,7 +156,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = 'Erro: ${e.toString()}';
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -207,7 +207,7 @@ class AuthProvider extends ChangeNotifier {
     } catch (e) {
       print('[AuthProvider] Exceção ao fazer Google Auth: $e');
       print('[AuthProvider] Stack: ${StackTrace.current}');
-      _error = 'Erro: ${e.toString()}';
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -264,7 +264,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -291,7 +291,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = 'Erro: ${e.toString()}';
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -318,7 +318,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = 'Erro: ${e.toString()}';
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -345,7 +345,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _error = 'Erro: ${e.toString()}';
+      _error = ApiService.friendlyErrorMessage(e);
       _isLoading = false;
       notifyListeners();
       return false;

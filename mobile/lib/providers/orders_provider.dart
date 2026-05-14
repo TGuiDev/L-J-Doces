@@ -39,7 +39,7 @@ class OrdersProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _safeNotify();
       return null;
     } finally {
@@ -71,7 +71,7 @@ class OrdersProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _safeNotify();
       return null;
     } finally {
@@ -106,7 +106,7 @@ class OrdersProvider extends ChangeNotifier {
         _safeNotify();
       }
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _safeNotify();
     } finally {
       _isLoading = false;
@@ -127,7 +127,7 @@ class OrdersProvider extends ChangeNotifier {
         _safeNotify();
       }
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _safeNotify();
     } finally {
       _isLoading = false;
@@ -144,7 +144,7 @@ class OrdersProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _safeNotify();
       return null;
     }
@@ -173,7 +173,7 @@ class OrdersProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      _error = e.toString();
+      _error = ApiService.friendlyErrorMessage(e);
       _safeNotify();
       return null;
     } finally {

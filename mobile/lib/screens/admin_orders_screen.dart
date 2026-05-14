@@ -4,6 +4,7 @@ import '../providers/orders_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/order_model.dart';
 import '../providers/admin_provider.dart';
+import '../services/api_service.dart';
 import 'qr_scanner_screen.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
@@ -1178,13 +1179,25 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                   setState(() {});
                 } else if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro: ${ordersProvider.error}')),
+                    SnackBar(
+                      content: Text(
+                        ordersProvider.error ??
+                            'Nao foi possivel atualizar o status.',
+                      ),
+                    ),
                   );
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro ao atualizar status: $e')),
+                    SnackBar(
+                      content: Text(
+                        ApiService.friendlyErrorMessage(
+                          e,
+                          fallback: 'Nao foi possivel atualizar o status.',
+                        ),
+                      ),
+                    ),
                   );
                 }
               }

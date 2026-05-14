@@ -186,7 +186,23 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Erro: ${ordersProvider.error}'),
+                        const Icon(
+                          Icons.wifi_off_rounded,
+                          color: Colors.orange,
+                          size: 42,
+                        ),
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                          child: Text(
+                            ordersProvider.error!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         ElevatedButton(
                           onPressed: () {

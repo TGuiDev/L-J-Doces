@@ -5,6 +5,7 @@ import '../providers/cart_provider.dart';
 import '../providers/orders_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/stock_sync_provider.dart';
+import '../services/api_service.dart';
 import '../models/order_model.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -134,7 +135,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao finalizar pedido: $e')),
+          SnackBar(
+            content: Text(
+              ApiService.friendlyErrorMessage(
+                e,
+                fallback: 'Nao foi possivel finalizar o pedido.',
+              ),
+            ),
+          ),
         );
       }
     } finally {

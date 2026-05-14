@@ -381,15 +381,18 @@ class _ProductScreenState extends State<ProductScreen> {
                               color: Colors.orange[800],
                             ),
                           ),
-                          if (!prod.isAvailableToday)
-                            Text(
-                              prod.availableDaysString,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Dias disponíveis: ${prod.availableDaysString}',
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: prod.isAvailableToday
+                                  ? Colors.black54
+                                  : Colors.red,
+                              fontWeight: FontWeight.w700,
                             ),
+                          ),
                         ],
                       ),
                     ],

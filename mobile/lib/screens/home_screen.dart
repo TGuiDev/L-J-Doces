@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/admin_provider.dart';
 import '../providers/favorites_provider.dart';
+import '../services/api_service.dart';
 import '../models/category_model.dart';
 import '../models/product_model.dart';
 import '../widgets/favorite_icon.dart';
@@ -88,12 +91,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _homeScrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+  final ApiService _apiService = ApiService();
 
   int _currentIndex = 0;
   String? _selectedCategoryId;
   String? _previousCategoryId;
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
+  int _suggestionSeed = DateTime.now().millisecondsSinceEpoch;
+  List<Product> _topOrderedProducts = [];
 
   bool _isSvgUrl(String? url) {
     if (url == null || url.isEmpty) return false;
@@ -109,12 +115,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _homeScrollController.addListener(_onScroll);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final adminProvider = context.read<AdminProvider>();
 
-      adminProvider.fetchCategories();
+      await adminProvider.fetchCategories();
 
-      adminProvider.fetchProductsPage(
+      await adminProvider.fetchProductsPage(
         refresh: true,
         forceApiRefresh: true,
         categoryId: _selectedCategoryId,
@@ -126,6 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (authProvider.isAuthenticated && authProvider.token != null) {
         context.read<FavoritesProvider>().fetchFavorites(authProvider.token!);
       }
+
+      await _loadTopOrderedProducts();
     });
   }
 
@@ -163,6 +171,28 @@ class _HomeScreenState extends State<HomeScreen> {
           categoryId: _selectedCategoryId,
           subcategoryId: _selectedSubcategoryId,
         );
+  }
+
+  Future<void> _loadTopOrderedProducts() async {
+    try {
+      final topOrderedProducts = await _apiService.getTopOrderedProducts();
+
+      if (!mounted) return;
+
+      setState(() {
+        _topOrderedProducts = topOrderedProducts;
+        _suggestionSeed = DateTime.now().millisecondsSinceEpoch;
+      });
+    } catch (e) {
+      debugPrint('[HomeScreen] Erro ao carregar mais pedidos: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _topOrderedProducts = [];
+        _suggestionSeed = DateTime.now().millisecondsSinceEpoch;
+      });
+    }
   }
 
   @override
@@ -354,7 +384,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return RefreshIndicator(
       color: const Color(0xFFFF7A00),
       onRefresh: () async {
-        _reloadProducts(forceApiRefresh: true);
+        await context.read<AdminProvider>().fetchProductsPage(
+              refresh: true,
+              forceApiRefresh: true,
+              categoryId: _selectedCategoryId,
+              subcategoryId: _selectedSubcategoryId,
+            );
+        await _loadTopOrderedProducts();
       },
       child: CustomScrollView(
         controller: _homeScrollController,
@@ -388,21 +424,118 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: _buildSubcategories(currentSelectedCategory),
             ),
-          SliverToBoxAdapter(
-            child: _buildSectionHeader(
-              title: _selectedCategoryId == null
-                  ? 'Mais pedidos'
-                  : currentSelectedCategory?.name ?? 'Produtos',
-              subtitle: 'Carregando aos poucos para ficar mais rápido',
+          if (_selectedCategoryId == null && !_showFavoritesOnly)
+            ...[
+              _buildMostOrderedSection(adminProvider.allProducts),
+              SliverToBoxAdapter(
+                child: _buildSectionHeader(
+                  title: 'Sugestoes para voce',
+                  subtitle: 'Todos os itens em ordem aleatoria',
+                ),
+              ),
+              _buildRandomProductsGrid(adminProvider.allProducts),
+            ]
+          else ...[
+            SliverToBoxAdapter(
+              child: _buildSectionHeader(
+                title: _showFavoritesOnly
+                    ? 'Favoritos'
+                    : currentSelectedCategory?.name ?? 'Produtos',
+                subtitle: _showFavoritesOnly
+                    ? 'Seus itens favoritos salvos'
+                    : 'Carregando aos poucos para ficar mais rapido',
+              ),
             ),
-          ),
-          ..._buildFilteredProductsSlivers(
-            products: products,
-            adminProvider: adminProvider,
-          ),
+            ..._buildFilteredProductsSlivers(
+              products: products,
+              adminProvider: adminProvider,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildMostOrderedSection(List<Product> allProducts) {
+    final mostOrdered = _getMostOrderedProducts(allProducts);
+
+    if (mostOrdered.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 20),
+          child: Text(
+            'Nenhum produto comprado para mostrar por enquanto.',
+            style: TextStyle(color: Colors.black45),
+          ),
+        ),
+      );
+    }
+
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader(
+            title: 'Mais pedidos',
+            subtitle: 'Os 10 itens mais comprados',
+          ),
+          SizedBox(
+            height: 244,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              itemCount: mostOrdered.length,
+              itemBuilder: (context, index) {
+                final product = mostOrdered[index];
+
+                return SizedBox(
+                  width: 164,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: index == mostOrdered.length - 1 ? 0 : 12,
+                    ),
+                    child: _HorizontalProductCard(product: product),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  List<Product> _getMostOrderedProducts(List<Product> allProducts) {
+    if (_topOrderedProducts.isNotEmpty) {
+      return _topOrderedProducts.take(10).toList();
+    }
+
+    return allProducts.take(10).toList();
+  }
+
+  List<Product> _buildRandomProducts(List<Product> allProducts) {
+    final randomProducts = List<Product>.of(allProducts);
+    randomProducts.shuffle(Random(_suggestionSeed));
+    return randomProducts;
+  }
+
+  Widget _buildRandomProductsGrid(List<Product> allProducts) {
+    final randomProducts = _buildRandomProducts(allProducts);
+
+    if (randomProducts.isEmpty) {
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(24, 4, 24, 24),
+          child: Text(
+            'Nenhum item para mostrar por enquanto.',
+            style: TextStyle(color: Colors.black45),
+          ),
+        ),
+      );
+    }
+
+    return _buildProductSliverGrid(randomProducts);
   }
 
   Widget _buildHeroBanner() {
@@ -1488,6 +1621,100 @@ class _SubcategoryChip extends StatelessWidget {
         style: TextStyle(
           color: selected ? const Color(0xFFFF7A00) : Colors.black87,
           fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _HorizontalProductCard extends StatelessWidget {
+  final Product product;
+
+  const _HorizontalProductCard({
+    required this.product,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = product.images.isNotEmpty
+        ? product.images.first
+        : 'assets/images/Logo.png';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductScreen(product: product),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 7),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 134,
+              width: double.infinity,
+              child: FadeInImage.assetNetwork(
+                placeholder: 'lib/assets/images/Logo.png',
+                image: imageUrl,
+                fit: BoxFit.cover,
+                imageErrorBuilder: (_, __, ___) {
+                  return Container(
+                    color: Colors.grey[200],
+                    child: const Icon(
+                      Icons.image_not_supported_outlined,
+                      color: Colors.grey,
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1F1F1F),
+                      height: 1.12,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    'R\$ ${product.price.toStringAsFixed(2).replaceAll('.', ',')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFE86F00),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

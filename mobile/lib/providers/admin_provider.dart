@@ -24,6 +24,7 @@ class AdminProvider with ChangeNotifier {
 
   List<Category> get categories => _categories;
   List<Product> get products => _products;
+  List<Product> get allProducts => _allProducts;
   List<BannerModel> get banners => _banners;
   bool get isLoading => _isLoadingCategories || _isLoadingBanners;
   bool get isLoadingProducts => _isLoadingProducts;
@@ -88,6 +89,22 @@ class AdminProvider with ChangeNotifier {
         return matchesCategory && matchesSubcategory;
       }).toList();
 
+      // If no category filter is applied ("Todas"), show the full list
+      // instead of paginating, so the admin sees all products when "Todos"
+      // está selecionado.
+      if (categoryId == null) {
+        if (refresh) {
+          _products = filteredProducts;
+        } else {
+          // Append any new items if loading more (rare for this branch)
+          _products = [..._products, ...filteredProducts];
+        }
+        _currentProductPage = 0;
+        _hasMoreProducts = false;
+        return;
+      }
+
+      // Paginação padrão quando há filtro de categoria
       final startIndex = _currentProductPage * _productsPageSize;
       if (startIndex >= filteredProducts.length) {
         _hasMoreProducts = false;
