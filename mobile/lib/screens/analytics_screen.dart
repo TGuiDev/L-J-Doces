@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_const
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -35,6 +37,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       numValue = double.tryParse(value) ?? 0;
     }
     return numValue.toStringAsFixed(decimals);
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  int _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.round();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  String _formatCurrency(dynamic value) {
+    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(
+      _toDouble(value),
+    );
+  }
+
+  String _formatCount(dynamic value) {
+    return _toInt(value).toString();
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+      ),
+    );
   }
 
   @override
@@ -98,6 +133,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     setState(() {
       isLoading = true;
       error = null;
+      summary = null;
     });
 
     try {
@@ -105,6 +141,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final result = await apiService.getOperationalSummary(
         startDate: dateFormat.format(startDate),
         endDate: dateFormat.format(endDate),
+        stream: true,
+        onStreamUpdate: (partialSummary) {
+          if (!mounted) return;
+
+          setState(() {
+            summary = partialSummary;
+            selectedTab = 0;
+          });
+        },
       );
 
       setState(() {
@@ -119,6 +164,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
       setState(() {
         error = friendlyMessage;
+        summary = null;
         isLoading = false;
       });
       // ignore: use_build_context_synchronously
@@ -223,7 +269,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
             // Content
-            if (summary != null)
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    error!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              )
+            else if (summary != null)
               Column(
                 children: [
                   // Tab Navigation
@@ -309,25 +375,76 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       case 0:
         return _buildSummaryTab();
       case 1:
-        return _buildSalesTab();
+        return _buildSalesTabCoherent();
       case 2:
-        return _buildProductsTab();
+        return _buildProductsTabCoherent();
       case 3:
-        return _buildProfitabilityTab();
+        return _buildProfitabilityTabCoherent();
       case 4:
-        return _buildPaymentsTab();
+        return _buildPaymentsTabCoherent();
       case 5:
-        return _buildTemporalTab();
+        return _buildTemporalTabCoherent();
       default:
         return const SizedBox.shrink();
     }
   }
 
   Widget _buildSummaryTab() {
+    final usedAi = summary!.usedAi;
+    final sourceLabel = switch (summary!.aiSource) {
+      'gemini' => 'Resultado da IA: Gemini 2.5 Flash',
+      'openai' => 'Resultado da IA: OpenAI',
+      _ => 'Resultado da IA',
+    };
+    final statusColor = usedAi ? Colors.green : Colors.orange;
+    final statusIcon = usedAi ? Icons.cloud_done : Icons.info_outline;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: statusColor.withOpacity(0.4)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(statusIcon, color: statusColor, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        sourceLabel,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (!usedAi && summary!.fallbackReason != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            summary!.fallbackReason!,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -345,25 +462,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Implementar compartilhamento
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidade em desenvolvimento')),
-              );
-            },
-            icon: const Icon(Icons.share),
-            label: const Text('Compartilhar Relatório'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orangeAccent,
-            ),
-          ),
+          const SizedBox(height: 2),
         ],
       ),
     );
   }
 
+  // ignore: unused_element
   Widget _buildSalesTab() {
     final sales = summary?.rawData['sales'] as Map<String, dynamic>?;
 
@@ -459,6 +564,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
+  // ignore: unused_element
   Widget _buildProductsTab() {
     final products = summary?.rawData['products'] as Map<String, dynamic>?;
 
@@ -595,18 +701,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildProfitabilityTab() {
     final profit = summary?.rawData['profitability'] as Map<String, dynamic>?;
 
     if (profit == null) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
+          padding: EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               const Text('Dados de lucratividade não disponíveis'),
             ],
           ),
@@ -669,7 +776,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           product['name'],
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -693,18 +800,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildPaymentsTab() {
     final payments = summary?.rawData['payments'] as Map<String, dynamic>?;
 
     if (payments == null) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
+          padding: EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               const Text('Dados de pagamentos não disponíveis'),
             ],
           ),
@@ -776,18 +884,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildTemporalTab() {
     final temporal = summary?.rawData['temporal'] as Map<String, dynamic>?;
 
     if (temporal == null) {
-      return Center(
+      return const Center(
         child: Padding(
-          padding: const EdgeInsets.all(32.0),
+          padding: EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               const Text('Dados temporais não disponíveis'),
             ],
           ),
@@ -868,6 +977,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
+                  // ignore: unnecessary_cast
                   'R\$ ${(((peakDay as List?)?[1] ?? 0) as num).toStringAsFixed(2)}',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -886,48 +996,408 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  Widget _buildSalesTabCoherent() {
+    final sales = summary?.rawData['sales'] as Map<String, dynamic>?;
+    if (sales == null) {
+      return _buildEmptyState('Dados de vendas nao disponiveis');
+    }
+
+    final statuses = (sales['ordersByStatus'] as Map<String, dynamic>?) ?? {};
+    final totalOrders = _toInt(sales['totalOrders']);
+    final delivered = _toInt(statuses['delivered']);
+    final confirmed = _toInt(statuses['confirmed']);
+    final pending = _toInt(statuses['pending']);
+    final cancelled = _toInt(statuses['cancelled'] ?? statuses['canceled']);
+    final activeOrders = delivered + confirmed;
+    final cancellationRate =
+        totalOrders > 0 ? (cancelled / totalOrders) * 100 : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildMetricCard('Total de Pedidos', _formatCount(totalOrders), 'Qtd', Colors.blue),
+        _buildMetricCard('Receita Total', _formatCurrency(sales['totalRevenue']), 'R\$', Colors.green),
+        _buildMetricCard('Ticket Medio', _formatCurrency(sales['averageOrderValue']), 'TM', Colors.orange),
+        _buildMetricCard('Confirmados + Entregues', _formatCount(activeOrders), 'OK', Colors.teal),
+        _buildMetricCard(
+          'Pendentes / Cancelados',
+          '$pending / $cancelled',
+          '${cancellationRate.toStringAsFixed(1)}%',
+          cancelled > 0 ? Colors.red : Colors.green,
+        ),
+        _buildSectionTitle('Status dos Pedidos'),
+        ...statuses.entries.map(
+          (entry) => _buildSimpleRow(
+            _formatOrderStatus(entry.key),
+            _formatCount(entry.value),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductsTabCoherent() {
+    final products = summary?.rawData['products'] as Map<String, dynamic>?;
+    if (products == null) {
+      return _buildEmptyState('Dados de produtos nao disponiveis');
+    }
+
+    final topProducts = (products['topProducts'] as List?) ?? [];
+    final lowStockProducts = (products['lowStockProducts'] as List?) ?? [];
+    final productsWithoutSales = (products['productsWithoutSales'] as List?) ?? [];
+    final totalProducts = _toInt(products['totalProductsInCatalog']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildMetricCard('Produtos no Catalogo', _formatCount(totalProducts), 'SKU', Colors.blue),
+        _buildMetricCard('Produtos Vendidos', _formatCount(topProducts.length), 'Giro', Colors.green),
+        _buildMetricCard('Estoque Baixo', _formatCount(lowStockProducts.length), 'Crit', Colors.red),
+        _buildMetricCard('Sem Venda no Periodo', _formatCount(productsWithoutSales.length), 'Parado', Colors.orange),
+        _buildSectionTitle('Mais Vendidos'),
+        if (topProducts.isEmpty)
+          Text('Nenhum produto vendido no periodo.', style: TextStyle(color: Colors.grey[600]))
+        else
+          ...topProducts.take(10).map<Widget>((item) {
+            final product = item as Map;
+            final quantity = _toInt(product['quantity']);
+            final stock = _toInt(product['currentStock'] ?? product['stock_quantity']);
+            return _buildDataTile(
+              product['productName']?.toString() ?? 'Produto',
+              '${_formatCount(quantity)} unidade(s) vendida(s) • estoque atual: $stock',
+              _formatCurrency(product['revenue']),
+              Colors.green,
+            );
+          }),
+        _buildSectionTitle('Estoque Baixo'),
+        if (lowStockProducts.isEmpty)
+          Text('Nenhum produto com estoque baixo.', style: TextStyle(color: Colors.grey[600]))
+        else
+          ...lowStockProducts.take(10).map<Widget>((item) {
+            final product = item as Map;
+            return _buildDataTile(
+              product['name']?.toString() ?? 'Produto',
+              'Estoque: ${_formatCount(product['stock_quantity'])}',
+              _formatCurrency(product['price']),
+              Colors.red,
+            );
+          }),
+        _buildSectionTitle('Sem Venda no Periodo'),
+        if (productsWithoutSales.isEmpty)
+          Text('Nenhum produto parado identificado.', style: TextStyle(color: Colors.grey[600]))
+        else
+          ...productsWithoutSales.take(10).map<Widget>((item) {
+            final product = item as Map;
+            return _buildDataTile(
+              product['name']?.toString() ?? 'Produto',
+              'Estoque parado: ${_formatCount(product['stock_quantity'])}',
+              _formatCurrency(product['price']),
+              Colors.orange,
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildProfitabilityTabCoherent() {
+    final profit = summary?.rawData['profitability'] as Map<String, dynamic>?;
+    final sales = summary?.rawData['sales'] as Map<String, dynamic>?;
+    if (profit == null) {
+      return _buildEmptyState('Dados de lucratividade nao disponiveis');
+    }
+
+    final itemRevenue = _toDouble(profit['totalRevenue']);
+    final salesRevenue = _toDouble(sales?['totalRevenue']);
+    final difference = salesRevenue - itemRevenue;
+    final hasMismatch = difference.abs() > 0.01;
+    final negativeProducts = (profit['negativeMarginProducts'] as List?) ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildMetricCard('Receita por Itens', _formatCurrency(itemRevenue), 'Itens', Colors.green),
+        _buildMetricCard('Custo Estimado', _formatCurrency(profit['totalCost']), 'Custo', Colors.orange),
+        _buildMetricCard(
+          'Lucro Estimado',
+          _formatCurrency(profit['profit']),
+          _toDouble(profit['profit']) < 0 ? 'Neg' : 'Pos',
+          _toDouble(profit['profit']) < 0 ? Colors.red : Colors.green,
+        ),
+        _buildMetricCard('Margem Estimada', '${_formatPercent(profit['marginPercentage'])}%', 'Mg', Colors.blue),
+        if (hasMismatch) ...[
+          _buildSectionTitle('Conferencia dos Dados'),
+          Text(
+            'A receita de vendas (${_formatCurrency(salesRevenue)}) esta diferente da receita por itens (${_formatCurrency(itemRevenue)}). Confira se todos os pedidos possuem itens vinculados.',
+            style: TextStyle(color: Colors.orange[800], height: 1.4),
+          ),
+        ],
+        _buildSectionTitle('Produtos com Margem Negativa'),
+        if (negativeProducts.isEmpty)
+          Text('Nenhum produto com prejuizo identificado.', style: TextStyle(color: Colors.grey[600]))
+        else
+          ...negativeProducts.map<Widget>((item) {
+            final product = item as Map;
+            return _buildDataTile(
+              product['name']?.toString() ?? 'Produto',
+              'Receita: ${_formatCurrency(product['revenue'])} • custo: ${_formatCurrency(product['cost'])}',
+              _formatCurrency(product['loss']),
+              Colors.red,
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildPaymentsTabCoherent() {
+    final payments = summary?.rawData['payments'] as Map<String, dynamic>?;
+    if (payments == null) {
+      return _buildEmptyState('Dados de pagamentos nao disponiveis');
+    }
+
+    final totalPayments = _toInt(payments['totalPayments']);
+    final completedPayments = _toInt(payments['completedPayments']);
+    final pendingPayments = totalPayments - completedPayments;
+    final statusMap = (payments['paymentsByStatus'] as Map<String, dynamic>?) ?? {};
+    final methodMap = (payments['paymentsByMethod'] as Map<String, dynamic>?) ?? {};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildMetricCard('Pagamentos Gerados', _formatCount(totalPayments), 'Qtd', Colors.blue),
+        _buildMetricCard('Pagamentos Concluidos', _formatCount(completedPayments), 'OK', Colors.green),
+        _buildMetricCard('Pagamentos Pendentes', _formatCount(pendingPayments), 'Pend', pendingPayments > 0 ? Colors.orange : Colors.green),
+        _buildMetricCard('Taxa de Pagamento', '${_formatPercent(payments['paymentRate'])}%', 'Taxa', Colors.orange),
+        _buildMetricCard('Valor Confirmado', _formatCurrency(payments['totalCompletedAmount']), 'R\$', Colors.green),
+        _buildSectionTitle('Status dos Pagamentos'),
+        ...statusMap.entries.map(
+          (entry) => _buildSimpleRow(
+            _formatPaymentStatus(entry.key),
+            _formatCount(entry.value),
+          ),
+        ),
+        _buildSectionTitle('Metodos de Pagamento'),
+        ...methodMap.entries.map(
+          (entry) => _buildSimpleRow(entry.key.toString(), _formatCount(entry.value)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTemporalTabCoherent() {
+    final temporal = summary?.rawData['temporal'] as Map<String, dynamic>?;
+    if (temporal == null) {
+      return _buildEmptyState('Dados temporais nao disponiveis');
+    }
+
+    final salesByDay = (temporal['salesByDayOfWeek'] as Map<String, dynamic>?) ?? {};
+    final revenueByDay = (temporal['revenueByDayOfWeek'] as Map<String, dynamic>?) ?? {};
+    final salesByHour = (temporal['salesByHour'] as Map<String, dynamic>?) ?? {};
+    final revenueByHour = (temporal['revenueByHour'] as Map<String, dynamic>?) ?? {};
+    final peakDay = temporal['peakDay'] as List?;
+    final topHours = salesByHour.entries.toList()
+      ..sort((a, b) => _toDouble(b.value).compareTo(_toDouble(a.value)));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (peakDay != null)
+          _buildDataTile(
+            'Dia com Maior Receita',
+            peakDay[0]?.toString() ?? 'N/A',
+            _formatCurrency(peakDay.length > 1 ? peakDay[1] : 0),
+            Colors.orange,
+          ),
+        _buildSectionTitle('Pedidos por Dia da Semana'),
+        _buildBarList(
+          salesByDay,
+          valueBuilder: (value) => '${_formatCount(value)} pedido(s)',
+          color: Colors.blue,
+        ),
+        _buildSectionTitle('Receita por Dia da Semana'),
+        _buildBarList(
+          revenueByDay,
+          valueBuilder: _formatCurrency,
+          color: Colors.green,
+        ),
+        _buildSectionTitle('Horarios com Mais Pedidos'),
+        ...topHours.take(6).map(
+          (entry) => _buildSimpleRow(
+            entry.key.toString(),
+            '${_formatCount(entry.value)} pedido(s) • ${_formatCurrency(revenueByHour[entry.key])}',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange),
+            const SizedBox(height: 16),
+            Text(message),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(label)),
+          const SizedBox(width: 12),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDataTile(
+    String title,
+    String subtitle,
+    String trailing,
+    Color color,
+  ) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(8),
+        color: color.withOpacity(0.06),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            trailing,
+            textAlign: TextAlign.right,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarList(
+    Map<String, dynamic> values, {
+    required String Function(dynamic value) valueBuilder,
+    required Color color,
+  }) {
+    if (values.isEmpty) {
+      return Text('Nenhum dado disponivel.', style: TextStyle(color: Colors.grey[600]));
+    }
+
+    final maxValue = values.values
+        .map(_toDouble)
+        .fold<double>(0, (max, value) => value > max ? value : max);
+
+    return Column(
+      children: values.entries.map((entry) {
+        final value = _toDouble(entry.value);
+        final factor = maxValue > 0 ? value / maxValue : 0.0;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Row(
+            children: [
+              SizedBox(width: 104, child: Text(entry.key, style: const TextStyle(fontSize: 12))),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: factor.clamp(0.0, 1.0),
+                    minHeight: 8,
+                    backgroundColor: color.withOpacity(0.15),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 86,
+                child: Text(
+                  valueBuilder(entry.value),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _formatPaymentStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'Concluidos';
+      case 'pending':
+        return 'Pendentes';
+      case 'failed':
+        return 'Falharam';
+      case 'cancelled':
+      case 'canceled':
+        return 'Cancelados';
+      default:
+        return status;
+    }
+  }
+
   Widget _buildMetricCard(
     String label,
     String value,
-    String icon,
+    String unit,
     Color color,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: color.withOpacity(0.3)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
             Text(
-              icon,
-              style: const TextStyle(fontSize: 32),
+              label,
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ],
         ),

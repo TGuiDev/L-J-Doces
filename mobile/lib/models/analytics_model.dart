@@ -4,11 +4,19 @@ class OperationalSummary {
   final bool success;
   final String summary;
   final Map<String, dynamic> rawData;
+  final String aiSource;
+  final bool usedAi;
+  final String? fallbackReason;
+  final String? error;
 
   OperationalSummary({
     required this.success,
     required this.summary,
     required this.rawData,
+    required this.aiSource,
+    required this.usedAi,
+    this.fallbackReason,
+    this.error,
   });
 
   factory OperationalSummary.fromJson(
@@ -26,6 +34,20 @@ class OperationalSummary {
           Map<String, dynamic>.from(
             json['rawData'] ?? {},
           ),
+
+      aiSource:
+          json['aiSource']?.toString() ?? 'unknown',
+
+      usedAi:
+          json['usedAi'] == true ||
+          json['aiSource'] == 'openai' ||
+          json['aiSource'] == 'gemini',
+
+      fallbackReason:
+          json['fallbackReason']?.toString(),
+
+      error:
+          json['error']?.toString(),
     );
   }
 }

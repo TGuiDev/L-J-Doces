@@ -6,6 +6,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const port = Number(process.env.PORT) || 3000;
 
+  app.use((req: any, _res: any, next: any) => {
+    console.log(`[HTTP] ${req.method} ${req.originalUrl || req.url}`);
+    next();
+  });
+
   // Configurar CORS para aceitar localhost em qualquer porta + futuro Android
   app.enableCors({
     origin: true, // Aceita qualquer origem (dev apenas!)

@@ -74,60 +74,88 @@ export class AnalyticsService {
     const endISO = end.toISOString();
 
     try {
-      // Produtos mais vendidos
-      const { data: topProducts } = await client
-        .rpc('get_top_products', {
-          start_date: startISO,
-          end_date: endISO,
-        })
-        .match(async () => {
-          // Fallback: busca manual de top produtos
-          const { data: orderItems } = await client
-            .from('order_items')
-            .select('product_id, quantity, unit_price')
-            .gte('created_at', startISO)
-            .lte('created_at', endISO);
+      const { data: orders, error: ordersError } = await client
+        .from('orders')
+        .select('id')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .neq('status', 'cancelled');
 
-          const { data: products } = await client.from('products').select('*');
+      if (ordersError) throw ordersError;
 
-          const productSales = {};
-          orderItems?.forEach((item) => {
-            if (!productSales[item.product_id]) {
-              productSales[item.product_id] = { quantity: 0, revenue: 0 };
-            }
-            productSales[item.product_id].quantity += item.quantity;
-            productSales[item.product_id].revenue +=
-              item.quantity * parseFloat(item.unit_price);
-          });
+      const orderIds = (orders || []).map((order) => order.id);
 
-          const result = Object.entries(productSales)
-            .map(([productId, sales]: any) => {
-              const product = products?.find((p) => p.id === productId);
-              return {
-                productId,
-                productName: product?.name || 'Desconhecido',
-                quantity: sales.quantity,
-                revenue: sales.revenue,
-                profit: sales.revenue - product?.cost_price * sales.quantity,
-              };
-            })
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 10);
-
-          return { data: result };
-        });
-
-      // Estoque baixo
-      const { data: lowStockProducts } = await client
+      const { data: products, error: productsError } = await client
         .from('products')
-        .select('id, name, stock_quantity, price, cost_price')
-        .lt('stock_quantity', 10);
+        .select('id, name, stock_quantity, price, cost_price');
+
+      if (productsError) throw productsError;
+
+      const productSales = {};
+
+      if (orderIds.length > 0) {
+        const { data: orderItems, error: itemsError } = await client
+          .from('order_items')
+          .select('product_id, quantity, unit_price')
+          .in('order_id', orderIds);
+
+        if (itemsError) throw itemsError;
+
+        orderItems?.forEach((item) => {
+          if (!productSales[item.product_id]) {
+            productSales[item.product_id] = { quantity: 0, revenue: 0 };
+          }
+
+          productSales[item.product_id].quantity += Number(item.quantity || 0);
+          productSales[item.product_id].revenue +=
+            Number(item.quantity || 0) * Number(item.unit_price || 0);
+        });
+      }
+
+      const topProducts = Object.entries(productSales)
+        .map(([productId, sales]: any) => {
+          const product = products?.find((p) => p.id === productId);
+          const costPrice = Number(product?.cost_price || 0);
+
+          return {
+            productId,
+            productName: product?.name || 'Desconhecido',
+            quantity: sales.quantity,
+            revenue: sales.revenue,
+            profit: sales.revenue - costPrice * sales.quantity,
+            currentStock: Number(product?.stock_quantity || 0),
+            unitPrice: Number(product?.price || 0),
+            costPrice,
+          };
+        })
+        .sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue)
+        .slice(0, 10);
+
+      const soldProductIds = new Set(Object.keys(productSales));
+      const productsWithoutSales = (products || [])
+        .filter((product) => !soldProductIds.has(product.id))
+        .sort(
+          (a, b) =>
+            Number(b.stock_quantity || 0) - Number(a.stock_quantity || 0),
+        )
+        .slice(0, 10);
+
+      const lowStockProducts = (products || [])
+        .filter((product) => Number(product.stock_quantity || 0) < 10)
+        .sort(
+          (a, b) =>
+            Number(a.stock_quantity || 0) - Number(b.stock_quantity || 0),
+        );
+
+      console.log(
+        `[ANALYTICS] Product fetch: orders=${orderIds.length} top=${topProducts.length} withoutSales=${productsWithoutSales.length} lowStock=${lowStockProducts.length}`,
+      );
 
       return {
-        topProducts: topProducts || [],
-        lowStockProducts: lowStockProducts || [],
-        totalProductsInCatalog: (await client.from('products').select('*'))
-          .data?.length || 0,
+        topProducts,
+        lowStockProducts,
+        productsWithoutSales,
+        totalProductsInCatalog: products?.length || 0,
       };
     } catch (error) {
       console.error('Erro ao buscar análise de produtos:', error);
@@ -145,17 +173,35 @@ export class AnalyticsService {
     const endISO = end.toISOString();
 
     try {
-      // Buscar itens de pedido com custos
-      const { data: orderItems } = await client
-        .from('order_items')
-        .select('product_id, quantity, unit_price')
+      const { data: orders, error: ordersError } = await client
+        .from('orders')
+        .select('id')
         .gte('created_at', startISO)
-        .lte('created_at', endISO);
+        .lte('created_at', endISO)
+        .neq('status', 'cancelled');
+
+      if (ordersError) throw ordersError;
+
+      const orderIds = (orders || []).map((order) => order.id);
+
+      let orderItems = [];
+
+      if (orderIds.length > 0) {
+        const { data, error: itemsError } = await client
+          .from('order_items')
+          .select('product_id, quantity, unit_price')
+          .in('order_id', orderIds);
+
+        if (itemsError) throw itemsError;
+        orderItems = data || [];
+      }
 
       // Buscar custos dos produtos
-      const { data: products } = await client
+      const { data: products, error: productsError } = await client
         .from('products')
         .select('id, name, cost_price, price');
+
+      if (productsError) throw productsError;
 
       let totalRevenue = 0;
       let totalCost = 0;
@@ -167,6 +213,10 @@ export class AnalyticsService {
             totalCost += (parseFloat(product.cost_price) || 0) * item.quantity;
           }
       });
+
+      console.log(
+        `[ANALYTICS] Profitability fetch: orders=${orderIds.length} items=${orderItems.length} revenue=${totalRevenue} cost=${totalCost}`,
+      );
 
       const profit = totalRevenue - totalCost;
       const marginPercentage = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;

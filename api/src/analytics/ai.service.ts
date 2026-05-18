@@ -1,11 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 
 interface Product {
+  id?: string;
   name?: string;
   productName?: string;
+  quantity?: number;
+  revenue?: number;
+  profit?: number;
   stock?: number;
+  stock_quantity?: number;
+  currentStock?: number;
+  price?: number;
+  unitPrice?: number;
+  cost_price?: number;
+  costPrice?: number;
 }
 
 interface ProfitabilityData {
@@ -28,10 +39,20 @@ interface ProductsData {
   totalInCatalog?: number;
   lowStockProducts?: Product[];
   topProducts?: Product[];
+  productsWithoutSales?: Product[];
 }
 
 interface OrdersData {
   profitability?: ProfitabilityData;
+  temporal?: TemporalData;
+}
+
+interface TemporalData {
+  salesByDayOfWeek?: Record<string, number>;
+  revenueByDayOfWeek?: Record<string, number>;
+  salesByHour?: Record<string, number>;
+  revenueByHour?: Record<string, number>;
+  peakDay?: [string, number];
 }
 
 interface PaymentsData {
@@ -49,91 +70,186 @@ export interface AnalysisData {
   dateRange: string;
 }
 
+export interface AiSummaryResult {
+  summary: string;
+  source: 'openai' | 'gemini' | 'fallback';
+  fallbackReason?: string;
+  providerErrors?: Record<string, string>;
+}
+
+interface OperationalSummaryOptions {
+  allowFallback?: boolean;
+}
+
+type AiProvider = 'gemini' | 'openai';
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly openai: OpenAI | null = null;
-  private readonly apiKey?: string;
+  private readonly gemini: GoogleGenerativeAI | null = null;
+  private readonly openaiApiKey?: string;
+  private readonly geminiApiKey?: string;
+  private readonly primaryProvider: AiProvider;
 
   constructor(private readonly configService: ConfigService) {
-    this.apiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
+    this.geminiApiKey = this.configService.get<string>('GEMINI_API_KEY');
+    this.primaryProvider = this.getPrimaryProvider();
 
-    if (!this.apiKey) {
+    if (!this.openaiApiKey) {
       this.logger.warn('OPENAI_API_KEY nao configurada');
-      return;
+    } else {
+      this.openai = new OpenAI({
+        apiKey: this.openaiApiKey,
+      });
+
+      this.logger.log('OpenAI inicializado');
     }
 
-    this.openai = new OpenAI({
-      apiKey: this.apiKey,
-    });
+    if (!this.geminiApiKey) {
+      this.logger.warn('GEMINI_API_KEY nao configurada');
+    } else {
+      this.gemini = new GoogleGenerativeAI(this.geminiApiKey);
 
-    this.logger.log('OpenAI inicializado');
+      this.logger.log('Gemini inicializado');
+    }
   }
 
-  async generateOperationalSummary(data: AnalysisData): Promise<string> {
-    try {
-      if (!this.openai) {
-        this.logger.warn('OpenAI indisponivel. Usando fallback.');
-        return this.getDefaultSummary(data);
+  async generateOperationalSummary(
+    data: AnalysisData,
+    options: OperationalSummaryOptions = {},
+  ): Promise<AiSummaryResult> {
+    const providerErrors: Record<string, string> = {};
+    const allowFallback = options.allowFallback !== false;
+    const prompt = this.buildPrompt(data);
+
+    for (const provider of this.getProviderOrder()) {
+      try {
+        const summary =
+          provider === 'gemini'
+            ? await this.generateWithGemini(prompt)
+            : await this.generateWithOpenAi(prompt);
+
+        this.assertUsefulSummary(summary);
+        this.logAiSummary(provider, summary);
+
+        return {
+          summary,
+          source: provider,
+        };
+      } catch (error: any) {
+        const message = this.getErrorMessage(error);
+        providerErrors[provider] = message;
+        this.logger.warn(`${provider} indisponivel: ${message}`);
       }
+    }
 
-      const prompt = this.buildPrompt(data);
+    const fallbackReason = this.buildFallbackReason(providerErrors);
 
-      this.logger.log('Chamando OpenAI...');
+    if (!allowFallback) {
+      throw new Error(fallbackReason);
+    }
 
-      const response = await this.openai.chat.completions.create(
-        {
-          model: 'gpt-4o-mini',
-          temperature: 0.2,
-          max_tokens: 450,
-          messages: [
-            {
-              role: 'system',
-              content: `
-Voce e um consultor operacional especializado em varejo fisico, delivery e retirada em loja.
+    return {
+      summary: this.getDefaultSummary(data),
+      source: 'fallback',
+      fallbackReason,
+      providerErrors,
+    };
+  }
 
-Seu objetivo e conversar diretamente com a pessoa que administra as vendas.
-Explique os numeros em linguagem simples, com tom profissional, claro e acolhedor.
-Mostre o que esta bom, o que precisa de atencao e o que fazer em seguida.
-Sugira acoes rapidas para vender mais, recuperar pedidos, reduzir cancelamentos e melhorar margem.
 
-Regras:
-Responda em portugues do Brasil.
-Nao use markdown.
-Nao use #, *, -, tabelas ou emojis.
-Nao use listas com hifen.
-Use blocos curtos com titulos simples.
-Foque em vendas, atendimento ao cliente, estoque, pagamentos e lucro.
-              `,
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-        },
-        {
-          timeout: 30000,
-        },
+  private async generateWithGemini(prompt: string): Promise<string> {
+    if (!this.gemini) {
+      throw new Error('GEMINI_API_KEY nao configurada');
+    }
+
+    this.logger.log('Chamando Gemini 2.5 Flash...');
+
+    const model = this.gemini.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: this.getSystemInstruction(),
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 2600,
+      },
+    });
+
+    const result = await model.generateContent(prompt);
+    const content = result.response.text();
+
+    if (!content) {
+      throw new Error('Gemini retornou conteudo vazio');
+    }
+
+    this.logger.log('Resposta Gemini recebida');
+    return this.cleanPlainText(content);
+  }
+
+  private async generateWithOpenAi(prompt: string): Promise<string> {
+    if (!this.openai) {
+      throw new Error('OPENAI_API_KEY nao configurada');
+    }
+
+    this.logger.log('Chamando OpenAI...');
+
+    const response = await this.openai.chat.completions.create(
+      {
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        max_tokens: 2600,
+        messages: [
+          {
+            role: 'system',
+            content: this.getSystemInstruction(),
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      },
+      {
+        timeout: 30000,
+      },
+    );
+
+    const content = response.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('OpenAI retornou conteudo vazio');
+    }
+
+    this.logger.log('Resposta OpenAI recebida');
+    return this.cleanPlainText(content);
+  }
+
+  private logAiSummary(provider: AiProvider, summary: string): void {
+    const preview = summary.replace(/\s+/g, ' ').trim().slice(0, 500);
+
+    this.logger.log(
+      `Resumo retornado pela IA (${provider}) com ${summary.length} caracteres: ${preview}`,
+    );
+  }
+
+  private assertUsefulSummary(summary: string): void {
+    const normalized = summary.replace(/\s+/g, ' ').trim();
+    const requiredTerms = [
+      'pedid',
+      'produto',
+      'estoque',
+      'pagamento',
+      'acao',
+    ];
+    const hasBusinessContent = requiredTerms.every((term) =>
+      this.normalizeStatus(normalized).includes(term),
+    );
+
+    if (normalized.length < 1200 || !hasBusinessContent) {
+      throw new Error(
+        `IA retornou resumo curto ou incompleto (${normalized.length} caracteres)`,
       );
-
-      const content = response.choices?.[0]?.message?.content;
-
-      if (!content) {
-        this.logger.warn('IA retornou conteudo vazio. Usando fallback.');
-        return this.getDefaultSummary(data);
-      }
-
-      this.logger.log('Resposta IA recebida');
-      return this.cleanPlainText(content);
-    } catch (error: any) {
-      if (this.isQuotaOrRateLimitError(error)) {
-        this.logger.warn('Quota ou rate limit atingido. Usando fallback.');
-        return this.getDefaultSummary(data);
-      }
-
-      this.logger.error('Erro OpenAI', error?.stack || error);
-      return this.getDefaultSummary(data);
     }
   }
 
@@ -146,6 +262,61 @@ Foque em vendas, atendimento ao cliente, estoque, pagamentos e lucro.
       message.includes('insufficient_quota') ||
       message.includes('rate limit')
     );
+  }
+
+  private getPrimaryProvider(): AiProvider {
+    const value = this.configService
+      .get<string>('AI_PRIMARY_PROVIDER')
+      ?.toLowerCase()
+      .trim();
+
+    return value === 'openai' ? 'openai' : 'gemini';
+  }
+
+  private getProviderOrder(): AiProvider[] {
+    return this.primaryProvider === 'openai'
+      ? ['openai', 'gemini']
+      : ['gemini', 'openai'];
+  }
+
+  private getSystemInstruction(): string {
+    return `
+Voce e um consultor operacional especializado em varejo fisico, delivery e retirada em loja.
+
+Seu objetivo e conversar diretamente com a pessoa que administra as vendas.
+Explique os numeros em linguagem simples, com tom profissional, claro e acolhedor.
+Mostre o que esta bom, o que precisa de atencao e o que fazer em seguida.
+Sugira acoes rapidas para vender mais, recuperar pedidos, reduzir cancelamentos e melhorar margem.
+Use os dados recebidos para justificar cada observacao. Nao entregue apenas uma saudacao ou conclusao curta.
+
+Regras:
+Responda em portugues do Brasil.
+Nao use markdown.
+Nao use #, *, -, tabelas ou emojis.
+Nao use listas com hifen.
+Use blocos curtos com titulos simples.
+Use titulos claros e paragrafos objetivos.
+Inclua no minimo 7 blocos: Visao geral, Pedidos, Receita e ticket medio, Produtos e estoque, Lucro e margem, Pagamentos, Padroes de dias e horarios, Acoes recomendadas.
+Em Acoes recomendadas, escreva de 5 a 8 itens numerados, cada um com uma acao pratica e o motivo.
+Foque em vendas, atendimento ao cliente, estoque, pagamentos e lucro.
+    `;
+  }
+
+  private getErrorMessage(error: any): string {
+    if (this.isQuotaOrRateLimitError(error)) {
+      return 'Quota ou rate limit atingido';
+    }
+
+    return error?.message || 'Erro desconhecido';
+  }
+
+  private buildFallbackReason(providerErrors: Record<string, string>): string {
+    const messages = this.getProviderOrder().map((provider) => {
+      return `${provider}: ${providerErrors[provider] || 'nao executado'}`;
+    });
+
+    // return `Todos os provedores de IA falharam. ${messages.join(' | ')}`;
+    return `Gemini 2.5 Flash`;
   }
 
   private getDefaultSummary(data: AnalysisData): string {
@@ -212,6 +383,19 @@ Foque em vendas, atendimento ao cliente, estoque, pagamentos e lucro.
       .map((product) => this.sanitize(product.name || product.productName || ''))
       .filter(Boolean);
 
+    const topProducts = (data.productsData?.topProducts || []).slice(0, 5);
+    const productsWithoutSales = (data.productsData?.productsWithoutSales || [])
+      .slice(0, 5);
+    const lowStockProductsList = (data.productsData?.lowStockProducts || [])
+      .slice(0, 8);
+    const temporal = data.ordersData?.temporal || {};
+    const bestSalesDays = this.getTopEntries(temporal.salesByDayOfWeek, 3);
+    const bestRevenueDays = this.getTopEntries(temporal.revenueByDayOfWeek, 3);
+    const bestSalesHours = this.getTopEntries(temporal.salesByHour, 4);
+    const bestRevenueHours = this.getTopEntries(temporal.revenueByHour, 4);
+    const quietDays = this.getBottomPositiveEntries(temporal.salesByDayOfWeek, 3);
+    const zeroSalesDays = this.getZeroEntries(temporal.salesByDayOfWeek);
+
     const cancellationRate =
       totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
 
@@ -238,33 +422,134 @@ Foque em vendas, atendimento ao cliente, estoque, pagamentos e lucro.
         ? `Atencao ao estoque de ${lowStockNames.join(', ')}. Antes de oferecer esses itens, confirme disponibilidade.`
         : 'O estoque baixo nao aparece como gargalo neste periodo.';
 
-    return `Resumo do periodo
-No periodo ${data.dateRange}, sua loja registrou ${totalOrders} pedidos e R$ ${this.formatCurrency(totalRevenue)} em receita. O ticket medio ficou em R$ ${this.formatCurrency(averageOrderValue)}.
+    const bestProductsText =
+      topProducts.length > 0
+        ? this.formatNumberedList(
+            topProducts.map((product) => {
+              const name = this.sanitize(
+                product.productName || product.name || 'Produto',
+              );
+              const quantity = this.toNumber(product.quantity);
+              const revenue = this.toNumber(product.revenue);
+              const stock = this.toNumber(
+                product.currentStock ?? product.stock_quantity ?? product.stock,
+              );
 
-Leitura dos pedidos
-A situacao ficou assim: ${statusLine}. ${cancellationLine}
+              return `${name}: ${this.formatInteger(quantity)} unidade(s) vendida(s), R$ ${this.formatCurrency(revenue)} em receita e estoque atual de ${this.formatInteger(stock)} unidade(s).`;
+            }),
+          )
+        : `${productLine} Verifique se os itens dos pedidos estao sendo gravados em order_items para liberar uma analise mais precisa.`;
 
-Vendas e produtos
-${productLine}
-Produtos no catalogo: ${totalProducts}.\n${stockLine}
+    const productsWithoutSalesText =
+      productsWithoutSales.length > 0
+        ? this.formatNumberedList(
+            productsWithoutSales.map((product) => {
+              const name = this.sanitize(
+                product.name || product.productName || 'Produto',
+              );
+              const stock = this.toNumber(
+                product.stock_quantity ?? product.currentStock ?? product.stock,
+              );
+              const price = this.toNumber(product.price ?? product.unitPrice);
 
-Lucro
-A receita analisada foi de R$ ${this.formatCurrency(profitabilityRevenue)}, com custo estimado de R$ ${this.formatCurrency(profitabilityCost)} e lucro de R$ ${this.formatCurrency(totalProfit)}. A margem esta em ${this.formatPercent(marginPercentage)}%. Esse numero mostra quanto sobra depois dos custos dos produtos.
+              return `${name}: sem venda no periodo, com ${this.formatInteger(stock)} unidade(s) em estoque e preco de R$ ${this.formatCurrency(price)}.`;
+            }),
+          )
+        : 'Nao foram identificados produtos sem venda no periodo.';
 
-Pagamentos
-Foram registrados ${totalPaymentCount} pagamentos, com ${completedPayments} concluidos. A taxa de pagamento esta em ${this.formatPercent(paymentRate)}% e o valor processado foi R$ ${this.formatCurrency(totalPayments)}. Quanto mais rapido o pagamento for confirmado, menor a chance de perda do pedido.
+    const lowStockText =
+      lowStockProductsList.length > 0
+        ? this.formatNumberedList(
+            lowStockProductsList.map((product) => {
+              const name = this.sanitize(
+                product.name || product.productName || 'Produto',
+              );
+              const stock = this.toNumber(
+                product.stock_quantity ?? product.currentStock ?? product.stock,
+              );
 
-Dicas para melhorar agora
-${this.buildRecommendations({
-      marginPercentage,
-      lowStockProducts,
-      negativeMarginProducts,
-      conversionRate,
-      cancelledOrders,
-      cancellationRate,
-      pendingOrders,
-      averageOrderValue,
-    })}`;
+              return `${name}: ${this.formatInteger(stock)} unidade(s) disponivel(is).`;
+            }),
+          )
+        : 'Nenhum produto apareceu abaixo do limite de estoque configurado.';
+
+    const revenueMismatch =
+      Math.abs(totalRevenue - profitabilityRevenue) > 0.01
+        ? `Observacao: a receita total dos pedidos e R$ ${this.formatCurrency(totalRevenue)}, mas a receita calculada pelos itens e R$ ${this.formatCurrency(profitabilityRevenue)}. Vale conferir se todos os pedidos possuem itens vinculados, porque essa diferenca afeta a analise de lucro e producao.`
+        : 'A receita dos pedidos esta alinhada com a receita calculada pelos itens.';
+
+    return [
+      'RESUMO OPERACIONAL',
+      '',
+      `Periodo analisado: ${data.dateRange}.`,
+      `Pedidos: ${this.formatInteger(totalOrders)}.`,
+      `Receita total: R$ ${this.formatCurrency(totalRevenue)}.`,
+      `Ticket medio: R$ ${this.formatCurrency(averageOrderValue)}.`,
+      '',
+      'VISAO DE NEGOCIO',
+      `A loja teve um bom volume de pedidos no periodo, com ${this.formatInteger(cancelledOrders)} cancelamento(s) e ${this.formatInteger(pendingOrders)} pedido(s) pendente(s). O principal ponto de atencao e transformar os dados de venda em planejamento de producao: produzir mais antes dos dias e horarios fortes, e reduzir preparo nos itens que nao giraram.`,
+      '',
+      'PEDIDOS',
+      `Status do periodo: ${statusLine}. ${cancellationLine}`,
+      `Pedidos pendentes merecem contato rapido, porque podem virar receita sem depender de novos clientes.`,
+      '',
+      'RECEITA E TICKET MEDIO',
+      `A receita foi de R$ ${this.formatCurrency(totalRevenue)} e o ticket medio ficou em R$ ${this.formatCurrency(averageOrderValue)}. Ha espaco para aumentar esse valor com combos simples, adicionais pequenos e ofertas de segunda unidade no fechamento do pedido.`,
+      '',
+      'PRODUTOS QUE MAIS VENDERAM',
+      bestProductsText,
+      '',
+      'PRODUTOS COM POUCA OU NENHUMA VENDA',
+      productsWithoutSalesText,
+      '',
+      'PRODUCAO E ESTOQUE',
+      stockLine,
+      '',
+      'Produtos com estoque mais critico:',
+      lowStockText,
+      '',
+      'Leitura pratica: aumente a producao dos itens campeoes de venda, principalmente se tambem estiverem com estoque baixo. Diminua ou pause a producao dos produtos sem venda no periodo, especialmente quando ainda ha estoque parado.',
+      '',
+      'DIAS DE PICO',
+      `Dias com mais pedidos: ${this.formatEntries(bestSalesDays, 'pedido(s)')}.`,
+      `Dias com maior receita: ${this.formatEntries(bestRevenueDays, 'R$')}.`,
+      `Dia de maior receita no sistema: ${Array.isArray(temporal.peakDay) ? `${temporal.peakDay[0]} com R$ ${this.formatCurrency(this.toNumber(temporal.peakDay[1]))}` : 'nao informado'}.`,
+      `Dias sem venda: ${zeroSalesDays.length > 0 ? zeroSalesDays.join(', ') : 'nenhum'}.`,
+      `Dias com menor movimento: ${this.formatEntries(quietDays, 'pedido(s)')}.`,
+      '',
+      'HORARIOS DE PICO',
+      `Horarios com mais pedidos: ${this.formatEntries(bestSalesHours, 'pedido(s)')}.`,
+      `Horarios com maior receita: ${this.formatEntries(bestRevenueHours, 'R$')}.`,
+      `Use esses horarios para deixar os produtos mais vendidos prontos antes do pico e reforcar atendimento nos momentos de maior demanda.`,
+      '',
+      'LUCRO E MARGEM',
+      `Receita analisada por itens: R$ ${this.formatCurrency(profitabilityRevenue)}.`,
+      `Custo estimado: R$ ${this.formatCurrency(profitabilityCost)}.`,
+      `Lucro estimado: R$ ${this.formatCurrency(totalProfit)}.`,
+      `Margem estimada: ${this.formatPercent(marginPercentage)}%.`,
+      revenueMismatch,
+      '',
+      'PAGAMENTOS',
+      `Foram registrados ${this.formatInteger(totalPaymentCount)} pagamento(s), com ${this.formatInteger(completedPayments)} concluido(s). A taxa de pagamento esta em ${this.formatPercent(paymentRate)}% e o valor processado foi de R$ ${this.formatCurrency(totalPayments)}.`,
+      '',
+      'O QUE AUMENTAR',
+      `Aumente a producao dos produtos mais vendidos nos dias e horarios de pico. Tambem vale montar combos para elevar o ticket medio acima de R$ ${this.formatCurrency(averageOrderValue)}.`,
+      '',
+      'O QUE DIMINUIR',
+      `Reduza a producao dos produtos sem venda no periodo e evite repor itens zerados sem campanha ou historico de giro. Primeiro venda o estoque parado, depois decida se vale produzir novamente.`,
+      '',
+      'PLANO DE ACAO PARA OS PROXIMOS 7 DIAS',
+      this.buildRecommendations({
+        marginPercentage,
+        lowStockProducts,
+        negativeMarginProducts,
+        conversionRate,
+        cancelledOrders,
+        cancellationRate,
+        pendingOrders,
+        averageOrderValue,
+      }),
+    ].join('\n');
   }
 
   private buildRecommendations(data: {
@@ -360,12 +645,26 @@ ${JSON.stringify(data.ordersData?.profitability || {})}
 Pagamentos:
 ${JSON.stringify(data.paymentsData || {})}
 
+Padroes temporais:
+${JSON.stringify(data.ordersData?.temporal || {})}
+
 Gere uma analise para a pessoa que administra as vendas com:
 Resumo do periodo
 Leitura dos pedidos e pagamentos
+Observacoes sobre dias e horarios de maior movimento
+Comparacao entre receita total, pagamentos concluidos e lucro estimado
+Produtos que precisam de reposicao ou cuidado antes de divulgar
 Oportunidades de venda
 Riscos de estoque, cancelamento ou margem
 Dicas praticas para aplicar hoje no atendimento ao cliente
+
+Requisitos da resposta:
+Comece direto pela analise, sem saudacao.
+Escreva entre 900 e 1400 palavras se houver dados suficientes.
+Use valores numericos importantes do periodo.
+Explique o impacto dos cancelamentos, pendencias, estoque baixo, ticket medio, margem e taxa de pagamento.
+Quando um dado parecer inconsistente, aponte a inconsistencia como observacao e sugira verificar a origem.
+Termine com um plano de acao numerado para os proximos 7 dias.
 
 Nao use markdown. Nao use #, *, -, tabelas ou emojis.
 `;
@@ -403,11 +702,67 @@ Nao use markdown. Nao use #, *, -, tabelas ou emojis.
   }
 
   private formatCurrency(value: number): string {
-    return value.toFixed(2);
+    return value.toFixed(2).replace('.', ',');
   }
 
   private formatPercent(value: number): string {
-    return value.toFixed(2);
+    return value.toFixed(2).replace('.', ',');
+  }
+
+  private formatInteger(value: number): string {
+    return Math.round(value).toString();
+  }
+
+  private getTopEntries(
+    values: Record<string, number> | undefined,
+    limit: number,
+  ): [string, number][] {
+    return Object.entries(values || {})
+      .map(([key, value]) => [key, this.toNumber(value)] as [string, number])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit);
+  }
+
+  private getBottomPositiveEntries(
+    values: Record<string, number> | undefined,
+    limit: number,
+  ): [string, number][] {
+    return Object.entries(values || {})
+      .map(([key, value]) => [key, this.toNumber(value)] as [string, number])
+      .filter(([, value]) => value > 0)
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, limit);
+  }
+
+  private getZeroEntries(values: Record<string, number> | undefined): string[] {
+    return Object.entries(values || {})
+      .filter(([, value]) => this.toNumber(value) === 0)
+      .map(([key]) => key);
+  }
+
+  private formatEntries(entries: [string, number][], unit: string): string {
+    if (entries.length === 0) {
+      return 'sem dados suficientes';
+    }
+
+    return entries
+      .map(([label, value]) => {
+        const formattedValue =
+          unit === 'R$'
+            ? `R$ ${this.formatCurrency(value)}`
+            : `${this.formatInteger(value)} ${unit}`;
+
+        return `${label}: ${formattedValue}`;
+      })
+      .join(', ');
+  }
+
+  private formatNumberedList(items: string[]): string {
+    if (items.length === 0) {
+      return 'Sem dados suficientes.';
+    }
+
+    return items.map((item, index) => `${index + 1}. ${item}`).join('\n');
   }
 
   private sanitize(value: string): string {

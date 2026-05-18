@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import "../models/category_model.dart";
 import "../models/product_model.dart";
@@ -25,8 +27,14 @@ class ApiService {
     // Add interceptor to include token in requests and log
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
+        final safeHeaders = Map<String, dynamic>.from(options.headers);
+        if (safeHeaders['Authorization'] != null) {
+          safeHeaders['Authorization'] = 'Bearer ***';
+        }
+
+        print('[DIO] BASE_URL: ${options.baseUrl}');
         print('[DIO] REQUEST: ${options.method} ${options.path}');
-        print('[DIO] Headers: ${options.headers}');
+        print('[DIO] Headers: $safeHeaders');
         print('[DIO] Data: ${options.data}');
         return handler.next(options);
       },
@@ -611,6 +619,8 @@ class ApiService {
   Future<OperationalSummary> getOperationalSummary({
     String? startDate,
     String? endDate,
+    bool stream = false,
+    void Function(OperationalSummary summary)? onStreamUpdate,
   }) async {
     try {
       final params = <String, dynamic>{};
@@ -623,14 +633,32 @@ class ApiService {
         params['endDate'] = endDate;
       }
 
+      if (stream) {
+        params['stream'] = 'true';
+        return _getOperationalSummaryStream(
+          params,
+          onStreamUpdate: onStreamUpdate,
+        );
+      }
+
       final response = await _dio.get(
         '/analytics/operational-summary',
         queryParameters: params,
       );
 
-      return OperationalSummary.fromJson(
+      final summary = OperationalSummary.fromJson(
         Map<String, dynamic>.from(response.data),
       );
+
+      if (!summary.success) {
+        throw Exception(
+          summary.error?.isNotEmpty == true
+              ? summary.error
+              : 'Erro ao gerar resumo operacional',
+        );
+      }
+
+      return summary;
     } on DioException catch (e) {
       print('ApiService.getOperationalSummary Dio error: ${e.response?.data}');
 
@@ -645,6 +673,94 @@ class ApiService {
       print('ApiService.getOperationalSummary error: $e');
       throw Exception(friendlyErrorMessage(e));
     }
+  }
+
+  Future<OperationalSummary> _getOperationalSummaryStream(
+    Map<String, dynamic> params, {
+    void Function(OperationalSummary summary)? onStreamUpdate,
+  }) async {
+    final response = await _dio.get<ResponseBody>(
+      '/analytics/operational-summary',
+      queryParameters: params,
+      options: Options(
+        responseType: ResponseType.stream,
+        receiveTimeout: const Duration(minutes: 2),
+        headers: {'Accept': 'text/event-stream'},
+      ),
+    );
+
+    final body = response.data;
+    if (body == null) {
+      throw Exception('Resumo operacional vazio');
+    }
+
+    var buffer = '';
+    var accumulatedSummary = '';
+    var metadata = <String, dynamic>{};
+    OperationalSummary? currentSummary;
+
+    OperationalSummary buildSummary() {
+      return OperationalSummary(
+        success: true,
+        summary: accumulatedSummary,
+        rawData: Map<String, dynamic>.from(metadata['rawData'] ?? {}),
+        aiSource: metadata['aiSource']?.toString() ?? 'fallback',
+        usedAi: metadata['usedAi'] == true,
+        fallbackReason: metadata['fallbackReason']?.toString(),
+      );
+    }
+
+    void handleEvent(String rawEvent) {
+      String? eventName;
+      final dataLines = <String>[];
+
+      for (final line in const LineSplitter().convert(rawEvent)) {
+        if (line.startsWith('event:')) {
+          eventName = line.substring('event:'.length).trim();
+        } else if (line.startsWith('data:')) {
+          dataLines.add(line.substring('data:'.length).trimLeft());
+        }
+      }
+
+      if (eventName == null || dataLines.isEmpty) return;
+
+      final payload = jsonDecode(dataLines.join('\n'));
+      if (payload is! Map<String, dynamic>) return;
+
+      if (eventName == 'metadata') {
+        metadata = payload;
+        currentSummary = buildSummary();
+        onStreamUpdate?.call(currentSummary!);
+      } else if (eventName == 'chunk') {
+        accumulatedSummary += payload['text']?.toString() ?? '';
+        currentSummary = buildSummary();
+        onStreamUpdate?.call(currentSummary!);
+      } else if (eventName == 'done') {
+        currentSummary = buildSummary();
+      }
+    }
+
+    await for (final bytes in body.stream) {
+      buffer += utf8.decode(bytes, allowMalformed: true);
+
+      while (buffer.contains('\n\n')) {
+        final separatorIndex = buffer.indexOf('\n\n');
+        final rawEvent = buffer.substring(0, separatorIndex);
+        buffer = buffer.substring(separatorIndex + 2);
+        handleEvent(rawEvent);
+      }
+    }
+
+    if (buffer.trim().isNotEmpty) {
+      handleEvent(buffer);
+    }
+
+    final result = currentSummary ?? buildSummary();
+    if (!result.success) {
+      throw Exception(result.error ?? 'Erro ao gerar resumo operacional');
+    }
+
+    return result;
   }
 
   Future<ProductAnalytics> getProductAnalytics({

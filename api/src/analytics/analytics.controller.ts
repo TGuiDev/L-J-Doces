@@ -1,7 +1,10 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AnalyticsService } from './analytics.service';
 import { AiService } from './ai.service';
+
+console.log('teste')
 
 @Controller('analytics')
 @UseGuards(JwtAuthGuard)
@@ -39,8 +42,30 @@ export class AnalyticsController {
   async getOperationalSummary(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('stream') stream?: string,
+    @Res({ passthrough: true }) res?: Response,
   ) {
     try {
+      const payload = await this.buildOperationalSummaryPayload(
+        startDate,
+        endDate,
+      );
+
+      if (stream === 'true' && res) {
+        await this.streamOperationalSummary(res, payload);
+        return;
+      }
+
+      return {
+        success: true,
+        summary: payload.aiResult.summary,
+        aiSource: payload.aiResult.source,
+        usedAi: payload.aiResult.source !== 'fallback',
+        fallbackReason: payload.aiResult.fallbackReason,
+        providerErrors: payload.aiResult.providerErrors,
+        rawData: payload.rawData,
+      };
+
       // Converter datas se fornecidas
       const start = this.parseDateParam(startDate);
       const end = this.parseDateParam(endDate, true);
@@ -69,16 +94,32 @@ export class AnalyticsController {
           : sales.dateRange || 'Período atual',
       };
 
-      console.log('📊 Enviando dados para IA:', JSON.stringify(analysisData, null, 2));
+      console.log('[analytics] Tentando gerar resumo operacional com IA');
+      console.log(
+        '[analytics] Dados enviados para IA:',
+        JSON.stringify(analysisData, null, 2),
+      );
 
       // Gerar resumo com IA
-      const summary = await this.aiService.generateOperationalSummary(
+      const aiResult = await this.aiService.generateOperationalSummary(
         analysisData,
+        { allowFallback: true },
       );
+
+      console.log('[analytics] Resumo operacional gerado:', {
+        aiSource: aiResult.source,
+        usedAi: aiResult.source !== 'fallback',
+        fallbackReason: aiResult.fallbackReason ?? null,
+        summaryPreview: aiResult.summary?.slice(0, 300),
+      });
 
       return {
         success: true,
-        summary,
+        summary: aiResult.summary,
+        aiSource: aiResult.source,
+        usedAi: aiResult.source !== 'fallback',
+        fallbackReason: aiResult.fallbackReason,
+        providerErrors: aiResult.providerErrors,
         rawData: {
           sales,
           products,
@@ -88,12 +129,121 @@ export class AnalyticsController {
         },
       };
     } catch (error: any) {
-      console.error('❌ Erro ao gerar resumo operacional:', error);
+      console.error('[analytics] Falha ao gerar resumo operacional:', {
+        message: error?.message,
+        stack: error?.stack,
+      });
       return {
         success: false,
         error: error.message || 'Erro ao gerar resumo operacional',
       };
     }
+  }
+
+  private async buildOperationalSummaryPayload(
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const start = this.parseDateParam(startDate);
+    const end = this.parseDateParam(endDate, true);
+
+    const [sales, products, profitability, payments, temporal] =
+      await Promise.all([
+        this.analyticsService.getSalesAnalytics(start, end),
+        this.analyticsService.getProductAnalytics(start, end),
+        this.analyticsService.getProfitabilityAnalysis(start, end),
+        this.analyticsService.getPaymentAnalytics(start, end),
+        this.analyticsService.getTemporalAnalytics(start, end),
+      ]);
+
+    const analysisData = {
+      salesData: sales,
+      productsData: products,
+      ordersData: {
+        profitability,
+        temporal,
+      },
+      paymentsData: payments,
+      dateRange:
+        startDate && endDate
+          ? `${startDate} a ${endDate}`
+          : sales.dateRange || 'Período atual',
+    };
+
+    console.log('[analytics] Tentando gerar resumo operacional com IA');
+    console.log(
+      '[analytics] Dados enviados para IA:',
+      JSON.stringify(analysisData, null, 2),
+    );
+
+    const aiResult = await this.aiService.generateOperationalSummary(
+      analysisData,
+      { allowFallback: true },
+    );
+
+    console.log('[analytics] Resumo operacional gerado:', {
+      aiSource: aiResult.source,
+      usedAi: aiResult.source !== 'fallback',
+      fallbackReason: aiResult.fallbackReason ?? null,
+      summaryPreview: aiResult.summary?.slice(0, 300),
+    });
+
+    return {
+      aiResult,
+      rawData: {
+        sales,
+        products,
+        profitability,
+        payments,
+        temporal,
+      },
+    };
+  }
+
+  private async streamOperationalSummary(
+    res: Response,
+    payload: Awaited<
+      ReturnType<AnalyticsController['buildOperationalSummaryPayload']>
+    >,
+  ) {
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    this.writeSse(res, 'metadata', {
+      success: true,
+      aiSource: payload.aiResult.source,
+      usedAi: payload.aiResult.source !== 'fallback',
+      fallbackReason: payload.aiResult.fallbackReason,
+      providerErrors: payload.aiResult.providerErrors,
+      rawData: payload.rawData,
+    });
+
+    for (const chunk of this.splitStreamText(payload.aiResult.summary)) {
+      this.writeSse(res, 'chunk', { text: chunk });
+      await new Promise((resolve) => setTimeout(resolve, 18));
+    }
+
+    this.writeSse(res, 'done', {
+      success: true,
+      length: payload.aiResult.summary.length,
+    });
+    res.end();
+  }
+
+  private splitStreamText(text: string): string[] {
+    const chunks: string[] = [];
+    for (let index = 0; index < text.length; index += 90) {
+      chunks.push(text.slice(index, index + 90));
+    }
+
+    return chunks.length > 0 ? chunks : [''];
+  }
+
+  private writeSse(res: Response, event: string, data: unknown) {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 
   @Get('sales')
