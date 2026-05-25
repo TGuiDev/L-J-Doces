@@ -217,9 +217,15 @@ export class AuthService {
     try {
       console.log('[AuthService.resetPassword] Iniciando para:', email);
 
-      const { error } = await this.supabaseService.getClient().auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`,
-      });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectTo = frontendUrl.includes('reset-password')
+        ? frontendUrl
+        : `${frontendUrl.replace(/\/$/, '')}/reset-password`;
+
+      const { error } = await this.supabaseService.resetPasswordForEmail(
+        email,
+        redirectTo,
+      );
 
       if (error) {
         console.error('[AuthService.resetPassword] Erro do Supabase:', error);
@@ -288,6 +294,76 @@ export class AuthService {
       throw new BadRequestException(errorMessage || 'Erro ao atualizar senha');
     }
   }
+
+  async confirmResetPassword({
+    password,
+    code,
+    accessToken,
+    refreshToken,
+  }: {
+    password: string;
+    code?: string;
+    accessToken?: string;
+    refreshToken?: string;
+  }) {
+    try {
+      console.log('[AuthService.confirmResetPassword] Iniciando redefinicao por link');
+
+      this.validatePassword(password);
+
+      let result:
+        | Awaited<ReturnType<SupabaseService['updatePasswordWithRecoveryCode']>>
+        | Awaited<ReturnType<SupabaseService['updatePasswordWithRecoveryTokens']>>;
+
+      if (code) {
+        result = await this.supabaseService.updatePasswordWithRecoveryCode(
+          code,
+          password,
+        );
+      } else if (accessToken && refreshToken) {
+        result = await this.supabaseService.updatePasswordWithRecoveryTokens(
+          accessToken,
+          refreshToken,
+          password,
+        );
+      } else {
+        throw new BadRequestException('Link de redefinicao invalido ou expirado');
+      }
+
+      if (result.error) {
+        console.error('[AuthService.confirmResetPassword] Erro do Supabase:', result.error);
+        throw new BadRequestException('Link de redefinicao invalido ou expirado');
+      }
+
+      return {
+        success: true,
+        message: 'Senha atualizada com sucesso',
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[AuthService.confirmResetPassword] Erro:', errorMessage);
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      throw new BadRequestException(errorMessage || 'Erro ao atualizar senha');
+    }
+  }
+
+  private validatePassword(password: string) {
+    if (!password || password.length < 8) {
+      throw new BadRequestException('Senha deve ter pelo menos 8 caracteres');
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (!passwordRegex.test(password)) {
+      throw new BadRequestException(
+        'Senha deve conter pelo menos uma letra maiuscula, uma minuscula e um numero',
+      );
+    }
+  }
+
   async getProfile(userId: string) {
     try {
       const { data, error } = await this.supabaseService.getUserById(userId);

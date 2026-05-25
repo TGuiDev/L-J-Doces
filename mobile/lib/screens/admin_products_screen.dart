@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
+import '../services/api_service.dart';
 import '../models/category_model.dart';
 import '../models/product_model.dart';
 import "dart:typed_data";
@@ -83,8 +84,91 @@ InputDecoration _prettyInput({
   );
 }
 
+class _AiParticleButton extends StatelessWidget {
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final double size;
+
+  const _AiParticleButton({
+    required this.tooltip,
+    required this.onPressed,
+    this.isLoading = false,
+    this.size = 88,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(10);
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onPressed,
+          borderRadius: radius,
+          child: Ink(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7C3AED), Color(0xFFF97316)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: radius,
+              boxShadow: [_softShadow(0.10)],
+            ),
+            child: Stack(
+              children: [
+                // const Positioned(
+                //   left: 9,
+                //   top: 7,
+                //   child: Text('✨', style: TextStyle(fontSize: 13)),
+                // ),
+                // const Positioned(
+                //   right: 8,
+                //   top: 10,
+                //   child: Text('🍰', style: TextStyle(fontSize: 13)),
+                // ),
+                // const Positioned(
+                //   left: 10,
+                //   bottom: 8,
+                //   child: Text('🤖', style: TextStyle(fontSize: 13)),
+                // ),
+                // const Positioned(
+                //   right: 10,
+                //   bottom: 9,
+                //   child: Text('✨', style: TextStyle(fontSize: 12)),
+                // ),
+                Center(
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.4,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class AdminProductsScreen extends StatefulWidget {
-  const AdminProductsScreen({Key? key}) : super(key: key);
+  const AdminProductsScreen({super.key});
 
   @override
   State<AdminProductsScreen> createState() => _AdminProductsScreenState();
@@ -93,10 +177,13 @@ class AdminProductsScreen extends StatefulWidget {
 class _AdminProductsScreenState extends State<AdminProductsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _productSearchCtrl = TextEditingController();
 
   String _searchQuery = '';
   String? _selectedFilterCategoryId;
   String? _selectedFilterSubcategoryId;
+  final Set<int> _selectedFilterDays = <int>{};
+  String _selectedStockFilter = 'all';
 
   @override
   void initState() {
@@ -285,7 +372,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     }
 
     return ReorderableListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      header: _categoriesOverview(categories),
       itemCount: categories.length,
       buildDefaultDragHandles: false,
       proxyDecorator: (Widget child, int index, Animation<double> animation) {
@@ -309,32 +397,80 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     );
   }
 
+  Widget _categoriesOverview(List<Category> categories) {
+    final subcategoryCount = categories.fold<int>(
+      0,
+      (sum, category) => sum + category.subcategories.length,
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFFE7C2)),
+        boxShadow: [_softShadow(0.035)],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _miniPill(
+              icon: Icons.category_outlined,
+              text: '${categories.length} categorias',
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _miniPill(
+              icon: Icons.account_tree_outlined,
+              text: '$subcategoryCount subcategorias',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _categoryCard(Category cat, int index, {Key? key}) {
-    return Card(
+    return Container(
       key: key,
       clipBehavior: Clip.antiAlias,
-      elevation: 0,
-      color: _cardBg,
-      shadowColor: Colors.black.withOpacity(0.08),
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: _cardBg,
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: _softBorder),
+        border: Border.all(color: const Color(0xFFFFE7C2)),
+        boxShadow: [_softShadow(0.04)],
       ),
       child: ExpansionTile(
+        tilePadding: const EdgeInsets.fromLTRB(14, 8, 10, 8),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        iconColor: _brandOrangeDark,
+        collapsedIconColor: _brandOrangeDark,
         shape: const Border(),
         collapsedShape: const Border(),
         title: Text(
             cat.name,
             style: const TextStyle(fontWeight: FontWeight.w800, color: _textDark),
           ),
-        subtitle: Text(cat.description, style: const TextStyle(color: _mutedText)),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text(
+            cat.description.isEmpty
+                ? '${cat.subcategories.length} subcategorias'
+                : cat.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: _mutedText, height: 1.25),
+          ),
+        ),
         leading: Container(
           width: 54,
           height: 54,
           decoration: BoxDecoration(
             color: _brandOrangeSoft,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
             image: cat.imageUrl != null && cat.imageUrl!.isNotEmpty
                 ? DecorationImage(
                     image: NetworkImage(cat.imageUrl!), fit: BoxFit.cover)
@@ -347,22 +483,28 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+            _roundIconButton(
+              icon: Icons.edit_rounded,
+              color: Colors.blue,
               onPressed: () => _editCategory(cat),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+            const SizedBox(width: 6),
+            _roundIconButton(
+              icon: Icons.delete_outline_rounded,
+              color: _dangerRed,
               onPressed: () => _confirmDeleteCategory(cat),
             ),
             ReorderableDragStartListener(
               index: index,
-              child: const Icon(Icons.open_with, color: Colors.grey),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.drag_indicator_rounded, color: _mutedText),
+              ),
             ),
           ],
         ),
         children: [
-          const Divider(),
+          const Divider(height: 18, color: Color(0xFFFFE7C2)),
           if (cat.subcategories.isNotEmpty)
             ReorderableListView.builder(
               shrinkWrap: true,
@@ -387,60 +529,412 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
               },
               itemBuilder: (context, index) {
                 final sub = cat.subcategories[index];
-                return ListTile(
+                return Container(
                   key: ValueKey(sub.id),
-                  leading: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFCF7),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF3E7D8)),
+                  ),
+                  child: Row(
                     children: [
-                      const SizedBox(width: 8),
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
                           color: _creamBg,
-                          borderRadius: BorderRadius.circular(6),
-                          image:
-                              sub.imageUrl != null && sub.imageUrl!.isNotEmpty
-                                  ? DecorationImage(
-                                      image: NetworkImage(sub.imageUrl!),
-                                      fit: BoxFit.cover)
-                                  : null,
-                        ),
+                          borderRadius: BorderRadius.circular(12),
+                          image: sub.imageUrl != null && sub.imageUrl!.isNotEmpty
+                              ? DecorationImage(
+                                  image: NetworkImage(sub.imageUrl!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                      ),
                         child: sub.imageUrl == null || sub.imageUrl!.isEmpty
-                            ? const Icon(Icons.category,
-                                color: Color(0xFFFDA516), size: 20)
+                            ? const Icon(Icons.account_tree_outlined,
+                                color: _brandOrangeDark, size: 20)
                             : null,
                       ),
-                    ],
-                  ),
-                  title: Text(sub.name),
-                  subtitle: Text(sub.description),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                          icon: const Icon(Icons.edit,
-                              color: Colors.blue, size: 20),
-                          onPressed: () => _editSubcategory(cat.id, sub)),
-                      IconButton(
-                          icon: const Icon(Icons.delete,
-                              color: Colors.red, size: 20),
-                          onPressed: () => _confirmDeleteSubcategory(sub)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              sub.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _textDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              sub.description.isEmpty
+                                  ? 'Sem descricao'
+                                  : sub.description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _mutedText,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _roundIconButton(
+                        icon: Icons.edit_rounded,
+                        color: Colors.blue,
+                        onPressed: () => _editSubcategory(cat.id, sub),
+                      ),
+                      const SizedBox(width: 6),
+                      _roundIconButton(
+                        icon: Icons.delete_outline_rounded,
+                        color: _dangerRed,
+                        onPressed: () => _confirmDeleteSubcategory(sub),
+                      ),
                       ReorderableDragStartListener(
                         index: index,
-                        child: const Icon(Icons.open_with,
-                            color: Colors.grey, size: 20),
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(Icons.drag_indicator_rounded,
+                              color: _mutedText, size: 20),
+                        ),
                       ),
                     ],
                   ),
                 );
               },
             ),
-          ListTile(
-            leading: const Icon(Icons.add, color: Color(0xFFFDA516)),
-            title: const Text('Adicionar Subcategoria',
-                style: TextStyle(color: Color(0xFFFDA516))),
+          InkWell(
             onTap: () => _showSubcategoryDialog(context, cat.id),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: _brandOrangeSoft,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFFD8A8)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_rounded, color: _brandOrangeDark, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Adicionar subcategoria',
+                    style: TextStyle(
+                      color: _brandOrangeDark,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _roundIconButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      iconSize: 20,
+      style: IconButton.styleFrom(
+        backgroundColor: color.withOpacity(0.10),
+        foregroundColor: color,
+        minimumSize: const Size(34, 34),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      icon: Icon(icon),
+      onPressed: onPressed,
+    );
+  }
+
+  String _money(double value) {
+    return 'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String _safeString(Object? Function() read, [String fallback = '']) {
+    try {
+      final value = read();
+      if (value == null) return fallback;
+      return value.toString();
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  String? _safeNullableString(Object? Function() read) {
+    try {
+      final value = read();
+      return value?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  int _safeInt(Object? Function() read, [int fallback = 0]) {
+    try {
+      final value = read();
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(value?.toString() ?? '') ?? fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  double _safeDouble(Object? Function() read, [double fallback = 0]) {
+    try {
+      final value = read();
+      if (value is double) return value;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString().replaceAll(',', '.') ?? '') ??
+          fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  List<String> _safeImages(Product product) {
+    try {
+      final images = product.images;
+      if (images is List) {
+        return images.map((image) => image.toString()).toList();
+      }
+      return const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  bool _safeIsAvailableToday(Product product) {
+    try {
+      return product.isAvailableToday;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _productSearchCtrl.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  bool _matchesSelectedDays(Product product) {
+    if (_selectedFilterDays.isEmpty) {
+      return true;
+    }
+
+    try {
+      final availableDays = product.availableDays;
+      if (availableDays.isEmpty) return true;
+
+      return _selectedFilterDays.every(
+        (day) => availableDays[day] == true,
+      );
+    } catch (_) {
+      return true;
+    }
+  }
+
+  bool _matchesStockFilter(Product product) {
+    final stockQuantity = _safeInt(() => product.stockQuantity);
+    switch (_selectedStockFilter) {
+      case 'low':
+        return stockQuantity > 0 && stockQuantity <= 5;
+      case 'out':
+        return stockQuantity <= 0;
+      case 'in':
+        return stockQuantity > 0;
+      default:
+        return true;
+    }
+  }
+
+  void _clearProductFilters() {
+    setState(() {
+      _productSearchCtrl.clear();
+      _searchQuery = '';
+      _selectedFilterCategoryId = null;
+      _selectedFilterSubcategoryId = null;
+      _selectedFilterDays.clear();
+      _selectedStockFilter = 'all';
+    });
+    context.read<AdminProvider>().fetchProductsPage(
+          refresh: true,
+          categoryId: null,
+          forceApiRefresh: true,
+        );
+  }
+
+  String _categoryLabel(Product product, List<Category> categories) {
+    final productCategoryId = _safeString(() => product.categoryId);
+    final productSubcategoryId =
+        _safeNullableString(() => product.subcategoryId);
+
+    for (final category in categories) {
+      if (category.id != productCategoryId) continue;
+      final subcategories = category.subcategories.where(
+        (subcategory) => subcategory.id == productSubcategoryId,
+      );
+      if (subcategories.isNotEmpty) {
+        return '${category.name} / ${subcategories.first.name}';
+      }
+      return category.name;
+    }
+    return 'Sem categoria';
+  }
+
+  Widget _productAdminCard(Product product, List<Category> categories) {
+    final isAvailable = _safeIsAvailableToday(product);
+    final images = _safeImages(product);
+    final stockQuantity = _safeInt(() => product.stockQuantity);
+    final costPrice = _safeDouble(() => product.costPrice);
+    final price = _safeDouble(() => product.price);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFE7C2)),
+        boxShadow: [_softShadow(0.025)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: _brandOrangeSoft,
+                  borderRadius: BorderRadius.circular(10),
+                  image: images.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(images.first),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: images.isEmpty
+                    ? const Icon(
+                        Icons.bakery_dining_rounded,
+                        color: _brandOrangeDark,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _safeString(() => product.name, 'Produto'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: _textDark,
+                              fontSize: 14,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isAvailable
+                                ? _successGreen.withOpacity(0.12)
+                                : _dangerRed.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            isAvailable ? 'Hoje' : 'Agendar',
+                            style: TextStyle(
+                              color: isAvailable ? _successGreen : _dangerRed,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _categoryLabel(product, categories),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _mutedText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Custo: ${_money(costPrice)}  •  Venda: ${_money(price)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _textDark,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _miniPill(
+                icon: Icons.warehouse_outlined,
+                text: '$stockQuantity estoque',
+              ),
+              const Spacer(),
+              _roundIconButton(
+                icon: Icons.edit_rounded,
+                color: Colors.blue,
+                onPressed: () => _editProduct(
+                  context,
+                  product,
+                  context.read<AdminProvider>().categories,
+                ),
+              ),
+              const SizedBox(width: 6),
+              _roundIconButton(
+                icon: Icons.delete_outline_rounded,
+                color: _dangerRed,
+                onPressed: () => _confirmDeleteProduct(product),
+              ),
+            ],
           ),
         ],
       ),
@@ -451,241 +945,327 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     // Debug filtragem detalhado
     if (_selectedFilterCategoryId != null && products.isNotEmpty) {
       final matchCount = products
-          .where((p) => p.categoryId.toLowerCase() == _selectedFilterCategoryId!.toLowerCase())
+          .where((p) =>
+              _safeString(() => p.categoryId).toLowerCase() ==
+              _selectedFilterCategoryId!.toLowerCase())
           .length;
-      final uniqueIds = products.map((p) => p.categoryId).toSet().toList();
+      final uniqueIds =
+          products.map((p) => _safeString(() => p.categoryId)).toSet().toList();
       debugPrint('[AdminProducts] Filter: $_selectedFilterCategoryId | Matches: $matchCount / ${products.length}');
       debugPrint('[AdminProducts] IDs únicos nos produtos: $uniqueIds');
-      debugPrint('[AdminProducts] Primeiro produto: name=${products.first.name}, categoryId=${products.first.categoryId}');
+      debugPrint(
+          '[AdminProducts] Primeiro produto: name=${_safeString(() => products.first.name)}, categoryId=${_safeString(() => products.first.categoryId)}');
     }
 
     final filteredProducts = products.where((p) {
+      final productName = _safeString(() => p.name);
+      final categoryId = _safeString(() => p.categoryId);
+      final subcategoryId = _safeNullableString(() => p.subcategoryId);
       final matchesSearch =
-          p.name.toLowerCase().contains(_searchQuery.toLowerCase());
+          productName.toLowerCase().contains(_searchQuery.toLowerCase());
       // Comparação case-insensitive para IDs (UUIDs podem ter variação de case)
       final matchesCat = _selectedFilterCategoryId == null ||
-          (p.categoryId.isNotEmpty &&
-              p.categoryId.toLowerCase() == _selectedFilterCategoryId!.toLowerCase());
+          (categoryId.isNotEmpty &&
+              categoryId.toLowerCase() ==
+                  _selectedFilterCategoryId!.toLowerCase());
       final matchesSub = _selectedFilterSubcategoryId == null ||
-          (p.subcategoryId?.isNotEmpty == true &&
-              p.subcategoryId!.toLowerCase() == _selectedFilterSubcategoryId!.toLowerCase());
-      return matchesSearch && matchesCat && matchesSub;
+          (subcategoryId?.isNotEmpty == true &&
+              subcategoryId!.toLowerCase() ==
+                  _selectedFilterSubcategoryId!.toLowerCase());
+      final matchesDays = _matchesSelectedDays(p);
+      final matchesStock = _matchesStockFilter(p);
+      return matchesSearch &&
+          matchesCat &&
+          matchesSub &&
+          matchesDays &&
+          matchesStock;
     }).toList();
 
     final totalStock = filteredProducts.fold<int>(
       0,
-      (sum, product) => sum + product.stockQuantity,
+      (sum, product) => sum + _safeInt(() => product.stockQuantity),
     );
+    final lowStockCount = filteredProducts
+        .where(
+          (product) {
+            final stockQuantity = _safeInt(() => product.stockQuantity);
+            return stockQuantity > 0 && stockQuantity <= 5;
+          },
+        )
+        .length;
+    final hasActiveFilters = _searchQuery.isNotEmpty ||
+        _selectedFilterCategoryId != null ||
+        _selectedFilterSubcategoryId != null ||
+        _selectedFilterDays.isNotEmpty ||
+        _selectedStockFilter != 'all';
 
     Category? currentCategory;
-    if (_selectedFilterCategoryId != null) {
+    if (_selectedFilterCategoryId != null && categories.isNotEmpty) {
       currentCategory = categories.firstWhere(
         (c) => c.id == _selectedFilterCategoryId,
         orElse: () => categories.first,
       );
     }
 
-    return Column(
-      children: [
-        // Filters Section
-        Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: const Border.fromBorderSide(BorderSide(color: _softBorder)),
-            boxShadow: [_softShadow(0.04)],
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _miniPill(
-                      icon: Icons.inventory_2_outlined,
-                      text: '${filteredProducts.length} produtos',
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: const Border.fromBorderSide(BorderSide(color: _softBorder)),
+              boxShadow: [_softShadow(0.04)],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _miniPill(
+                        icon: Icons.inventory_2_outlined,
+                        text: '${filteredProducts.length} produtos',
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _miniPill(
+                        icon: Icons.warehouse_outlined,
+                        text: '$totalStock em estoque',
+                      ),
+                    ),
+                  ],
+                ),
+                if (lowStockCount > 0) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
                     child: _miniPill(
-                      icon: Icons.warehouse_outlined,
-                      text: '$totalStock em estoque',
+                      icon: Icons.warning_amber_rounded,
+                      text: '$lowStockCount com estoque baixo',
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Pesquisar produto...',
-                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _productSearchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Pesquisar produto...',
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFFDA516)),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Color(0xFFFDA516)),
-                  ),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  onChanged: (val) => setState(() => _searchQuery = val),
                 ),
-                onChanged: (val) => setState(() => _searchQuery = val),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String?>(
-                      value: _selectedFilterCategoryId,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: 'Categoria',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: _selectedFilterCategoryId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Categoria',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                              value: null, child: Text('Todas')),
+                          ...categories.map((c) =>
+                              DropdownMenuItem(value: c.id, child: Text(c.name))),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            _selectedFilterCategoryId = val;
+                            _selectedFilterSubcategoryId = null;
+                          });
+                          context.read<AdminProvider>().fetchProductsPage(
+                                refresh: true,
+                                categoryId: val,
+                                forceApiRefresh: true,
+                              );
+                        },
                       ),
-                      items: [
-                        const DropdownMenuItem(
-                            value: null, child: Text('Todas')),
-                        ...categories.map((c) =>
-                            DropdownMenuItem(value: c.id, child: Text(c.name))),
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedFilterCategoryId = val;
-                          _selectedFilterSubcategoryId =
-                              null; // reset subcategory filter
-                        });
-                        // Fetch products for the selected category
-                        context.read<AdminProvider>().fetchProductsPage(
-                              refresh: true,
-                              categoryId: val,
-                              forceApiRefresh: true,
-                            );
-                      },
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String?>(
-                      value: _selectedFilterSubcategoryId,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        labelText: 'Subcategoria',
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String?>(
+                        value: _selectedFilterSubcategoryId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Subcategoria',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                              value: null, child: Text('Todas')),
+                          if (currentCategory != null)
+                            ...currentCategory.subcategories.map((s) =>
+                                DropdownMenuItem(
+                                    value: s.id, child: Text(s.name))),
+                        ],
+                        onChanged: _selectedFilterCategoryId == null
+                            ? null
+                            : (val) => setState(
+                                () => _selectedFilterSubcategoryId = val),
                       ),
-                      items: [
-                        const DropdownMenuItem(
-                            value: null, child: Text('Todas')),
-                        if (currentCategory != null)
-                          ...currentCategory.subcategories.map((s) =>
-                              DropdownMenuItem(
-                                  value: s.id, child: Text(s.name))),
-                      ],
-                      onChanged: _selectedFilterCategoryId == null
-                          ? null
-                          : (val) => setState(
-                              () => _selectedFilterSubcategoryId = val),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedStockFilter,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Estoque',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Text('Todos'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'in',
+                            child: Text('Com estoque'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'low',
+                            child: Text('Estoque baixo'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'out',
+                            child: Text('Sem estoque'),
+                          ),
+                        ],
+                        onChanged: (val) => setState(
+                          () => _selectedStockFilter = val ?? 'all',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      tooltip: 'Limpar filtros',
+                      visualDensity: VisualDensity.compact,
+                      style: IconButton.styleFrom(
+                        backgroundColor: hasActiveFilters
+                            ? _brandOrangeSoft
+                            : const Color(0xFFF1F5F9),
+                        foregroundColor:
+                            hasActiveFilters ? _brandOrangeDark : _mutedText,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: hasActiveFilters ? _clearProductFilters : null,
+                      icon: const Icon(Icons.filter_alt_off_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final entry in const <MapEntry<int, String>>[
+                        MapEntry(0, 'Dom'),
+                        MapEntry(1, 'Seg'),
+                        MapEntry(2, 'Ter'),
+                        MapEntry(3, 'Qua'),
+                        MapEntry(4, 'Qui'),
+                        MapEntry(5, 'Sex'),
+                        MapEntry(6, 'Sab'),
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: Text(entry.value),
+                            selected: _selectedFilterDays.contains(entry.key),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            selectedColor: _brandOrangeSoft,
+                            checkmarkColor: _brandOrangeDark,
+                            labelStyle: TextStyle(
+                              color: _selectedFilterDays.contains(entry.key)
+                                  ? _brandOrangeDark
+                                  : _textDark,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                            side: BorderSide(
+                              color: _selectedFilterDays.contains(entry.key)
+                                  ? const Color(0xFFFFD8A8)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedFilterDays.add(entry.key);
+                                } else {
+                                  _selectedFilterDays.remove(entry.key);
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
-
-        // Product List
-        Expanded(
-          child: filteredProducts.isEmpty
-              ? _emptyState(
-                  icon: Icons.search_off_rounded,
-                  title: 'Nenhum produto encontrado',
-                  subtitle: 'Ajuste a busca ou limpe os filtros para ver mais itens.',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredProducts.length,
-                  itemBuilder: (context, index) {
-                    final prod = filteredProducts[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: _cardBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: _softBorder),
-                        boxShadow: [_softShadow(0.04)],
-                      ),
-                      child: Card(
-                      elevation: 0,
-                      color: Colors.transparent,
-                      margin: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        side: BorderSide.none,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(14),
-                        leading: Container(
-                          width: 60,
-                          height: 75,
-                          decoration: BoxDecoration(
-                            color: _brandOrangeSoft,
-                            borderRadius: BorderRadius.circular(7),
-                            image: prod.images.isNotEmpty
-                                ? DecorationImage(
-                                    image: NetworkImage('${prod.images.first}?v=${DateTime.now().millisecondsSinceEpoch}'))
-                                : null,
-                          ),
-                          child: prod.images.isEmpty
-                              ? const Icon(Icons.bakery_dining_rounded, color: _brandOrangeDark)
-                              : null,
-                        ),
-                        title: Text(
-                          prod.name,
-                          style: const TextStyle(fontWeight: FontWeight.w800, color: _textDark),
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            'R\$ ${prod.price.toStringAsFixed(2).replaceAll('.', ',')} • Estoque: ${prod.stockQuantity}',
-                            style: const TextStyle(color: _mutedText, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit,
-                                  color: Colors.blue, size: 20),
-                              onPressed: () => _editProduct(context, prod,
-                                  context.read<AdminProvider>().categories),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete,
-                                  color: Colors.red, size: 20),
-                              onPressed: () => _confirmDeleteProduct(prod),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ),
-                    );
-                  },
-                ),
-        ),
+        if (filteredProducts.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _emptyState(
+              icon: Icons.search_off_rounded,
+              title: 'Nenhum produto encontrado',
+              subtitle: 'Ajuste a busca ou limpe os filtros para ver mais itens.',
+            ),
+          )
+        else
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final prod = filteredProducts[index];
+                  return _productAdminCard(prod, categories);
+                },
+                childCount: filteredProducts.length,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -862,8 +1442,7 @@ class _ProductModal extends StatefulWidget {
   final List<Category> categories;
   final Product? product;
 
-  const _ProductModal({Key? key, required this.categories, this.product})
-      : super(key: key);
+  const _ProductModal({required this.categories, this.product});
 
   @override
   State<_ProductModal> createState() => _ProductModalState();
@@ -880,6 +1459,8 @@ class _ProductModalState extends State<_ProductModal> {
   String? _selectedCategoryId;
   String? _selectedSubcategoryId;
   bool _isUploading = false;
+  bool _isGeneratingImage = false;
+  bool _isGeneratingDescription = false;
 
   List<Map<String, dynamic>> _selectedImages = []; // store bytes and name
   final Map<int, bool> _availableDays = {
@@ -934,6 +1515,112 @@ class _ProductModalState extends State<_ProductModal> {
       }
     } catch (e) {
       debugPrint('Erro ao abrir galeria: $e');
+    }
+  }
+
+  String? _currentCategoryName() {
+    if (_selectedCategoryId == null) return null;
+
+    for (final category in widget.categories) {
+      if (category.id == _selectedCategoryId) {
+        return category.name;
+      }
+    }
+
+    return null;
+  }
+
+  String? _currentSubcategoryName() {
+    if (_selectedCategoryId == null || _selectedSubcategoryId == null) {
+      return null;
+    }
+
+    for (final category in widget.categories) {
+      if (category.id != _selectedCategoryId) continue;
+      for (final subcategory in category.subcategories) {
+        if (subcategory.id == _selectedSubcategoryId) {
+          return subcategory.name;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  void _showAiMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _generateProductDescription() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showAiMessage('Informe o nome do produto para gerar a descricao.');
+      return;
+    }
+
+    setState(() => _isGeneratingDescription = true);
+
+    try {
+      final description = await context.read<ApiService>().generateCatalogDescription(
+            name: name,
+            itemType: 'produto',
+            categoryName: _currentCategoryName(),
+            subcategoryName: _currentSubcategoryName(),
+          );
+
+      if (!mounted) return;
+      setState(() => _descCtrl.text = description);
+    } catch (e) {
+      _showAiMessage(ApiService.friendlyErrorMessage(
+        e,
+        fallback: 'Nao foi possivel gerar a descricao agora.',
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingDescription = false);
+      }
+    }
+  }
+
+  Future<void> _generateProductImage() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showAiMessage('Informe o nome do produto para gerar a imagem.');
+      return;
+    }
+
+    if (_selectedImages.length >= 5) {
+      _showAiMessage('Maximo de 5 imagens permitido.');
+      return;
+    }
+
+    setState(() => _isGeneratingImage = true);
+
+    try {
+      final generatedImage = await context.read<ApiService>().generateCatalogImage(
+            name: name,
+            itemType: 'produto',
+            categoryName: _currentCategoryName(),
+            subcategoryName: _currentSubcategoryName(),
+          );
+
+      if (!mounted) return;
+      setState(() {
+        _selectedImages.add({
+          'bytes': generatedImage.bytes,
+          'name': generatedImage.fileName,
+        });
+      });
+    } catch (e) {
+      _showAiMessage(ApiService.friendlyErrorMessage(
+        e,
+        fallback: 'Nao foi possivel gerar a imagem agora.',
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingImage = false);
+      }
     }
   }
 
@@ -1238,7 +1925,7 @@ final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
                                         ),
                                       ],
                                     );
-                                  }).toList(),
+                                  }),
                                   if (_selectedImages.length < 5)
                                     GestureDetector(
                                       onTap: _pickImages,
@@ -1260,6 +1947,13 @@ final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
                                         ),
                                       ),
                                     ),
+                                  // ajustar essa budega
+                                  // if (_selectedImages.length < 5)
+                                  //   _AiParticleButton(
+                                  //     tooltip: 'Gerar imagem com IA',
+                                  //     onPressed: _generateProductImage,
+                                  //     isLoading: _isGeneratingImage,
+                                  //   ),
                                 ],
                               ),
                             ],
@@ -1318,6 +2012,27 @@ final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
                           icon: Icons.receipt_long_outlined,
                           child: Column(
                             children: [
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Descricao curta',
+                                      style: TextStyle(
+                                        color: _textDark,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  _AiParticleButton(
+                                    tooltip: 'Gerar descrição com IA',
+                                    onPressed: _generateProductDescription,
+                                    isLoading: _isGeneratingDescription,
+                                    size: 42,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
                               TextField(
                                 controller: _descCtrl,
                                 maxLines: 3,
@@ -1454,13 +2169,12 @@ class _ImagePickerModal extends StatefulWidget {
   final Future<void> Function(String name, String desc, String? imageUrl) onSave;
 
   const _ImagePickerModal({
-    Key? key,
     required this.isSubcategory,
     this.initialName,
     this.initialDesc,
     this.initialImageUrl,
     required this.onSave,
-  }) : super(key: key);
+  });
 
   @override
   State<_ImagePickerModal> createState() => _ImagePickerModalState();
@@ -1473,6 +2187,8 @@ class _ImagePickerModalState extends State<_ImagePickerModal> {
   String? _selectedImageName;
   String? _existingImageUrl;
   bool _isUploading = false;
+  bool _isGeneratingImage = false;
+  bool _isGeneratingDescription = false;
 
   @override
   void initState() {
@@ -1498,15 +2214,84 @@ class _ImagePickerModalState extends State<_ImagePickerModal> {
     }
   }
 
+  void _showAiMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String get _itemTypeLabel => widget.isSubcategory ? 'subcategoria' : 'categoria';
+
+  Future<void> _generateDescription() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showAiMessage('Informe o nome para gerar a descricao.');
+      return;
+    }
+
+    setState(() => _isGeneratingDescription = true);
+
+    try {
+      final description = await context.read<ApiService>().generateCatalogDescription(
+            name: name,
+            itemType: _itemTypeLabel,
+          );
+
+      if (!mounted) return;
+      setState(() => _descCtrl.text = description);
+    } catch (e) {
+      _showAiMessage(ApiService.friendlyErrorMessage(
+        e,
+        fallback: 'Nao foi possivel gerar a descricao agora.',
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingDescription = false);
+      }
+    }
+  }
+
+  Future<void> _generateImage() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showAiMessage('Informe o nome para gerar a imagem.');
+      return;
+    }
+
+    setState(() => _isGeneratingImage = true);
+
+    try {
+      final generatedImage = await context.read<ApiService>().generateCatalogImage(
+            name: name,
+            itemType: _itemTypeLabel,
+          );
+
+      if (!mounted) return;
+      setState(() {
+        _selectedImageBytes = generatedImage.bytes;
+        _selectedImageName = generatedImage.fileName;
+        _existingImageUrl = null;
+      });
+    } catch (e) {
+      _showAiMessage(ApiService.friendlyErrorMessage(
+        e,
+        fallback: 'Nao foi possivel gerar a imagem agora.',
+      ));
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingImage = false);
+      }
+    }
+  }
+
   Future<String?> _uploadToCloudinary() async {
     if (_selectedImageBytes == null) return null;
     try {
       final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:3000';
       final dio = Dio();
 
-      final StorageService _storageService = StorageService();
-      await _storageService.init();
-      final token = _storageService.getToken();
+      final StorageService storageService = StorageService();
+      await storageService.init();
+      final token = storageService.getToken();
 
       if (token != null) {
         dio.options.headers['Authorization'] = 'Bearer $token';
@@ -1697,6 +2482,13 @@ class _ImagePickerModalState extends State<_ImagePickerModal> {
                                                 ),
                                     ),
                                   ),
+                                  // const SizedBox(width: 16),
+                                  // _AiParticleButton(
+                                  //   tooltip: 'Gerar imagem com IA',
+                                  //   onPressed: _generateImage,
+                                  //   isLoading: _isGeneratingImage,
+                                  //   size: 116,
+                                  // ),
                                   const SizedBox(width: 16),
                                   const Expanded(
                                     child: Text(
@@ -1725,6 +2517,27 @@ class _ImagePickerModalState extends State<_ImagePickerModal> {
                                 decoration: _prettyInput(label: 'Nome', icon: Icons.label_outline),
                               ),
                               const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'Descriçao',
+                                      style: TextStyle(
+                                        color: _textDark,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  _AiParticleButton(
+                                    tooltip: 'Gerar descricao com IA',
+                                    onPressed: _generateDescription,
+                                    isLoading: _isGeneratingDescription,
+                                    size: 42,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
                               TextField(
                                 controller: _descCtrl,
                                 maxLines: 3,

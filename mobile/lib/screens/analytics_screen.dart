@@ -14,6 +14,14 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  static const Color _primary = Color(0xFFFDA516);
+  static const Color _primaryDark = Color(0xFFF97316);
+  static const LinearGradient _brandGradient = LinearGradient(
+    colors: [_primary, _primaryDark],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   final DateFormat dateFormat = DateFormat('yyyy-MM-dd');
 
   late DateTime startDate;
@@ -178,9 +186,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Análise Operacional'),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: Colors.orange,
+        toolbarHeight: 72,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: _brandGradient,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Column(
+          children: [
+            Text(
+              'Resumo Operacional',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.2,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'Painel administrativo',
+              style: TextStyle(
+                color: Color(0xFFFFF7ED),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(

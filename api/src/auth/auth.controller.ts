@@ -91,6 +91,28 @@ export class AuthController {
       throw error;
     }
   }
+
+  @Post('confirm-reset-password')
+  async confirmResetPassword(
+    @Body()
+    body: {
+      password: string;
+      code?: string;
+      accessToken?: string;
+      refreshToken?: string;
+    },
+  ) {
+    console.log('[ConfirmResetPassword] Iniciando redefinicao por link');
+    try {
+      const result = await this.authService.confirmResetPassword(body);
+      console.log('[ConfirmResetPassword] Sucesso');
+      return result;
+    } catch (error) {
+      console.error('[ConfirmResetPassword] Erro:', error instanceof Error ? error.message : error);
+      throw error;
+    }
+  }
+
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   async getProfile(@Req() req: any) {

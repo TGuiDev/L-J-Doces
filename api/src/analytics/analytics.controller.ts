@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AnalyticsService } from './analytics.service';
@@ -136,6 +136,72 @@ export class AnalyticsController {
       return {
         success: false,
         error: error.message || 'Erro ao gerar resumo operacional',
+      };
+    }
+  }
+
+  @Post('catalog-description')
+  async generateCatalogDescription(
+    @Body()
+    body: {
+      name?: string;
+      itemType?: string;
+      categoryName?: string;
+      subcategoryName?: string;
+    },
+  ) {
+    try {
+      const result = await this.aiService.generateCatalogDescription({
+        name: body.name || '',
+        itemType: body.itemType,
+        categoryName: body.categoryName,
+        subcategoryName: body.subcategoryName,
+      });
+
+      return {
+        success: true,
+        description: result.summary,
+        aiSource: result.source,
+        usedAi: result.source !== 'fallback',
+        fallbackReason: result.fallbackReason,
+        providerErrors: result.providerErrors,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Erro ao gerar descricao',
+      };
+    }
+  }
+
+  @Post('catalog-image')
+  async generateCatalogImage(
+    @Body()
+    body: {
+      name?: string;
+      itemType?: string;
+      categoryName?: string;
+      subcategoryName?: string;
+    },
+  ) {
+    try {
+      const result = await this.aiService.generateCatalogImage({
+        name: body.name || '',
+        itemType: body.itemType,
+        categoryName: body.categoryName,
+        subcategoryName: body.subcategoryName,
+      });
+
+      return {
+        success: true,
+        imageBase64: result.imageBase64,
+        prompt: result.prompt,
+        aiSource: result.source,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Erro ao gerar imagem',
       };
     }
   }

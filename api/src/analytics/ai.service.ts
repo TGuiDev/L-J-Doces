@@ -670,6 +670,319 @@ Nao use markdown. Nao use #, *, -, tabelas ou emojis.
 `;
   }
 
+  async generateCatalogDescription(input: {
+    name: string;
+    itemType?: string;
+    categoryName?: string;
+    subcategoryName?: string;
+  }): Promise<AiSummaryResult> {
+    const name = input.name?.trim();
+
+    if (!name) {
+      throw new Error('Nome do item nao informado');
+    }
+
+    if (!this.openai) {
+      throw new Error('OPENAI_API_KEY nao configurada para gerar descricoes');
+    }
+
+    const itemType = input.itemType?.trim() || 'produto';
+    const contextLines = [
+      `Tipo de item: ${itemType}`,
+      `Nome: ${name}`,
+      input.categoryName ? `Categoria: ${input.categoryName}` : '',
+      input.subcategoryName ? `Subcategoria: ${input.subcategoryName}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const prompt = `
+Crie uma descricao curta para um catalogo de doces e salgados.
+
+${contextLines}
+
+Regras:
+Responda em portugues do Brasil.
+Use uma frase unica, atrativa e profissional.
+Nao use markdown, aspas, emojis ou hashtags.
+Nao invente ingredientes especificos se eles nao estiverem no nome.
+Limite a resposta a no maximo 170 caracteres.
+`;
+
+    try {
+      const description = await this.generateWithOpenAi(prompt);
+      const clean = this.cleanPlainText(description)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 220);
+
+      if (clean.length < 20) {
+        throw new Error('Descricao gerada muito curta');
+      }
+
+      return {
+        summary: clean,
+        source: 'openai',
+      };
+    } catch (error: any) {
+      const message = this.getErrorMessage(error);
+      this.logger.warn(`OpenAI indisponivel para descricao: ${message}`);
+
+      if (this.gemini) {
+        try {
+          const description = await this.generateWithGemini(prompt);
+          const clean = this.cleanPlainText(description)
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 220);
+
+          if (clean.length >= 20) {
+            return {
+              summary: clean,
+              source: 'gemini',
+              fallbackReason: `OpenAI indisponivel: ${message}`,
+              providerErrors: {
+                openai: message,
+              },
+            };
+          }
+        } catch (geminiError: any) {
+          const geminiMessage = this.getErrorMessage(geminiError);
+          this.logger.warn(
+            `Gemini indisponivel para descricao: ${geminiMessage}`,
+          );
+
+          return {
+            summary: this.buildDefaultCatalogDescription(name, itemType),
+            source: 'fallback',
+            fallbackReason: `OpenAI indisponivel: ${message}; Gemini indisponivel: ${geminiMessage}`,
+            providerErrors: {
+              openai: message,
+              gemini: geminiMessage,
+            },
+          };
+        }
+      }
+
+      return {
+        summary: this.buildDefaultCatalogDescription(name, itemType),
+        source: 'fallback',
+        fallbackReason: `OpenAI indisponivel: ${message}`,
+        providerErrors: {
+          openai: message,
+        },
+      };
+    }
+  }
+
+  async generateCatalogImage(input: {
+    name: string;
+    itemType?: string;
+    categoryName?: string;
+    subcategoryName?: string;
+  }): Promise<{ imageBase64: string; prompt: string; source: 'openai' }> {
+    const name = input.name?.trim();
+
+    if (!name) {
+      throw new Error('Nome do item nao informado');
+    }
+
+    if (!this.openai) {
+      throw new Error('OPENAI_API_KEY nao configurada para gerar imagens');
+    }
+
+    const itemType = input.itemType?.trim() || 'produto';
+    const details = [
+      input.categoryName ? `categoria ${input.categoryName}` : '',
+      input.subcategoryName ? `subcategoria ${input.subcategoryName}` : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const prompt = `
+Foto comercial quadrada para cardapio de uma doceria brasileira.
+Item: ${name}.
+Tipo: ${itemType}${details ? `. Contexto: ${details}` : ''}.
+Produto realista, apetitoso, bem iluminado, fundo claro, composicao limpa, sem texto, sem logo, sem pessoas, sem embalagem com marca.
+`;
+
+    const imageBase64 = await this.generateImageWithAvailableModel(prompt);
+
+    if (!imageBase64) {
+      throw new Error('OpenAI nao retornou imagem');
+    }
+
+    return {
+      imageBase64,
+      prompt: prompt.trim(),
+      source: 'openai',
+    };
+  }
+
+  private async generateImageWithAvailableModel(prompt: string): Promise<string> {
+    const configuredModel = this.configService
+      .get<string>('OPENAI_IMAGE_MODEL')
+      ?.trim();
+    const models = [
+      configuredModel,
+      'gpt-image-1',
+    ].filter((model, index, list): model is string => {
+      return Boolean(model) && list.indexOf(model) === index;
+    });
+
+    const errors: string[] = [];
+
+    for (const model of models) {
+      try {
+        this.logger.log(`Chamando OpenAI para gerar imagem com ${model}...`);
+
+        const response = await this.openai!.images.generate({
+          model,
+          prompt,
+          n: 1,
+          size: '1024x1024',
+        });
+
+        const imageData = response.data?.[0];
+        const imageBase64 =
+          imageData?.b64_json ||
+          (imageData?.url
+            ? await this.downloadImageAsBase64(imageData.url)
+            : '');
+
+        if (imageBase64) {
+          return imageBase64;
+        }
+
+        errors.push(`${model}: resposta sem imagem`);
+      } catch (error: any) {
+        const message = this.getErrorMessage(error);
+        errors.push(`${model}: ${message}`);
+        this.logger.warn(`Modelo de imagem ${model} indisponivel: ${message}`);
+      }
+    }
+
+    if (this.geminiApiKey) {
+      try {
+        return await this.generateImageWithGemini(prompt);
+      } catch (error: any) {
+        const message = this.getErrorMessage(error);
+        errors.push(`gemini: ${message}`);
+        this.logger.warn(`Gemini indisponivel para imagem: ${message}`);
+      }
+    }
+
+    throw new Error(`Nenhum modelo de imagem disponivel. ${errors.join(' | ')}`);
+  }
+
+  private async generateImageWithGemini(prompt: string): Promise<string> {
+    if (!this.geminiApiKey) {
+      throw new Error('GEMINI_API_KEY nao configurada para gerar imagens');
+    }
+
+    const configuredModel = this.configService
+      .get<string>('GEMINI_IMAGE_MODEL')
+      ?.trim();
+    const models = [
+      configuredModel,
+      'gemini-3.1-flash-image-preview',
+    ].filter((model, index, list): model is string => {
+      return Boolean(model) && list.indexOf(model) === index;
+    });
+
+    const errors: string[] = [];
+
+    for (const model of models) {
+      try {
+        this.logger.log(`Chamando Gemini para gerar imagem com ${model}...`);
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': this.geminiApiKey,
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [{ text: prompt }],
+                },
+              ],
+              generationConfig: {
+                responseModalities: ['TEXT', 'IMAGE'],
+                imageConfig: {
+                  aspectRatio: '1:1',
+                },
+              },
+            }),
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          const message =
+            data?.error?.message || `Gemini retornou HTTP ${response.status}`;
+          throw new Error(message);
+        }
+
+        const imageBase64 = this.extractGeminiImageBase64(data);
+
+        if (imageBase64) {
+          return imageBase64;
+        }
+
+        errors.push(`${model}: resposta sem imagem`);
+      } catch (error: any) {
+        const message = this.getErrorMessage(error);
+        errors.push(`${model}: ${message}`);
+        this.logger.warn(`Modelo Gemini ${model} indisponivel: ${message}`);
+      }
+    }
+
+    throw new Error(errors.join(' | '));
+  }
+
+  private extractGeminiImageBase64(data: any): string {
+    const candidates = data?.candidates || [];
+
+    for (const candidate of candidates) {
+      const parts = candidate?.content?.parts || [];
+
+      for (const part of parts) {
+        const inlineData = part?.inlineData || part?.inline_data;
+        const imageData = inlineData?.data;
+
+        if (typeof imageData === 'string' && imageData.trim().length > 0) {
+          return imageData;
+        }
+      }
+    }
+
+    return '';
+  }
+
+  private async downloadImageAsBase64(url: string): Promise<string> {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Falha ao baixar imagem gerada (${response.status})`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer).toString('base64');
+  }
+
+  private buildDefaultCatalogDescription(name: string, itemType: string): string {
+    if (!itemType.toLowerCase().includes('categor')) {
+      return `${name} e um produto especial da L&J Doces, pensado para deixar o cardapio mais atrativo e facilitar a escolha do cliente.`;
+    }
+
+    return `${name} e uma opcao especial da L&J Doces, pensada para deixar o cardapio mais atrativo e facilitar a escolha do cliente.`;
+  }
+
   private cleanPlainText(value: string): string {
     return value
       .replace(/^#{1,6}\s*/gm, '')

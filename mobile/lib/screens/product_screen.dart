@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/product_model.dart';
-import '../models/category_model.dart';
 import '../providers/favorites_provider.dart';
 import '../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
-import '../providers/admin_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/stock_sync_provider.dart';
 import '../widgets/favorite_icon.dart';
-import 'cart_screen.dart';
-import 'home_screen.dart';
 
 class ProductScreen extends StatefulWidget {
   final Product product;
 
-  const ProductScreen({Key? key, required this.product}) : super(key: key);
+  const ProductScreen({super.key, required this.product});
 
   @override
   State<ProductScreen> createState() => _ProductScreenState();
@@ -28,6 +25,7 @@ class _ProductScreenState extends State<ProductScreen> {
   StockSyncProvider? _stockSyncProvider;
   int _currentStockQuantity = 0;
   void Function(int)? _stockListener;
+  static const String _publicAppUrl = 'https://lej.guidev.site';
 
   @override
   void initState() {
@@ -144,6 +142,24 @@ class _ProductScreenState extends State<ProductScreen> {
     );
   }
 
+  Uri _productShareUri() {
+    return Uri.parse(_publicAppUrl).replace(
+      pathSegments: ['produto', widget.product.id],
+    );
+  }
+
+  Future<void> _shareProduct() async {
+    final link = _productShareUri().toString();
+    final price = widget.product.price.toStringAsFixed(2).replaceAll('.', ',');
+
+    await Share.share(
+      'Olha esse produto da L&J Doces e Salgados: ${widget.product.name}\n'
+      'R\$ $price\n\n'
+      '$link',
+      subject: widget.product.name,
+    );
+  }
+
   @override
   void dispose() {
     final stockSyncProvider = _stockSyncProvider;
@@ -204,7 +220,7 @@ class _ProductScreenState extends State<ProductScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.share_outlined, color: Colors.black87),
-            onPressed: () {},
+            onPressed: _shareProduct,
           ),
         ],
       ),
@@ -234,7 +250,7 @@ class _ProductScreenState extends State<ProductScreen> {
                         width: double.infinity,
                         loadingBuilder: (context, child, progress) {
                           if (progress == null) return child;
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator());
                         },
                         errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.broken_image, size: 60)),
                       );
@@ -250,7 +266,7 @@ class _ProductScreenState extends State<ProductScreen> {
                         icon: Icon(Icons.chevron_left, size: 36, color: Colors.black.withOpacity(_currentImageIndex > 0 ? 0.7 : 0.2)),
                         onPressed: _currentImageIndex > 0
                             ? () {
-                                _pageController.previousPage(duration: Duration(milliseconds: 300), curve: Curves.easeInOut);
+                                _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
                               }
                             : null,
                       ),
@@ -264,7 +280,7 @@ class _ProductScreenState extends State<ProductScreen> {
                         icon: Icon(Icons.chevron_right, size: 36, color: Colors.black.withOpacity(_currentImageIndex < images.length - 1 ? 0.7 : 0.2)),
                         onPressed: _currentImageIndex < images.length - 1
                             ? () {
-                                _pageController.nextPage(duration: Duration(milliseconds: 300), curve: Curves.easeInOut);
+                                _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
                               }
                             : null,
                       ),
@@ -308,7 +324,7 @@ class _ProductScreenState extends State<ProductScreen> {
                       itemBuilder: (context, index) {
                         return GestureDetector(
                           onTap: () {
-                            _pageController.animateToPage(index, duration: Duration(milliseconds: 300), curve: Curves.easeInOut);
+                            _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
                           },
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -331,7 +347,7 @@ class _ProductScreenState extends State<ProductScreen> {
                                   color: Colors.grey[200],
                                   width: 56,
                                   height: 56,
-                                  child: Icon(Icons.broken_image, size: 24),
+                                  child: const Icon(Icons.broken_image, size: 24),
                                 ),
                               ),
                             ),
@@ -355,23 +371,23 @@ class _ProductScreenState extends State<ProductScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          prod.name,
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
+                      Text(
+                        prod.name,
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                          height: 1.12,
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             'R\$ ${prod.price.toStringAsFixed(2).replaceAll('.', ',')}',
@@ -381,23 +397,28 @@ class _ProductScreenState extends State<ProductScreen> {
                               color: Colors.orange[800],
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: prod.isAvailableToday ? Colors.orange[50] : Colors.red[50],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
                             'Dias disponíveis: ${prod.availableDaysString}',
-                            textAlign: TextAlign.right,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: prod.isAvailableToday
-                                  ? Colors.black54
-                                  : Colors.red,
-                              fontWeight: FontWeight.w700,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: prod.isAvailableToday
+                                    ? Colors.black54
+                                    : Colors.red[700],
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   if (prod.isAvailableToday)
                     if (_currentStockQuantity > 0)
                       Container(

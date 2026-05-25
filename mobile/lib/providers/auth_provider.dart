@@ -352,6 +352,43 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> confirmResetPassword({
+    required String newPassword,
+    String? code,
+    String? accessToken,
+    String? refreshToken,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.confirmResetPassword(
+        newPassword: newPassword,
+        code: code,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+      );
+
+      if (response.success) {
+        _error = 'Senha atualizada com sucesso!';
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _error = response.error ?? 'Erro ao atualizar senha';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = ApiService.friendlyErrorMessage(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _apiService.logout();
     await _storageService.clearAll();

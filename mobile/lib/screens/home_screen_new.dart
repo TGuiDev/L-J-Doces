@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 import '../widgets/profile_image_widget.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();

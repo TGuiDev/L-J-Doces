@@ -9,7 +9,7 @@ import '../services/api_service.dart';
 import '../models/order_model.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({Key? key}) : super(key: key);
+  const CheckoutScreen({super.key});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -31,7 +31,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _notesController = TextEditingController();
 
   bool _isProcessing = false;
-  DeliveryType _deliveryType = DeliveryType.pickup;
+  final DeliveryType _deliveryType = DeliveryType.pickup;
   PaymentMethod _paymentMethod = PaymentMethod.pix;
 
   double get _deliveryFee {
@@ -785,8 +785,8 @@ class _OptionTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.onTap,
     this.trailing,
+    required this.onTap,
   });
 
   @override

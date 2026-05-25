@@ -6,11 +6,11 @@ class FavoriteIcon extends StatefulWidget {
   final Color? color;
 
   const FavoriteIcon({
-    Key? key,
+    super.key,
     required this.isFavorite,
     this.size = 24,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   State<FavoriteIcon> createState() => _FavoriteIconState();

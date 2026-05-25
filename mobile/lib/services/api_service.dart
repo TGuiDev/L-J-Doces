@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import "../models/category_model.dart";
@@ -7,7 +8,18 @@ import "../models/analytics_model.dart";
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/auth_response.dart';
 
+class GeneratedCatalogImage {
+  final Uint8List bytes;
+  final String fileName;
+
+  const GeneratedCatalogImage({
+    required this.bytes,
+    required this.fileName,
+  });
+}
+
 class ApiService {
+  static const String defaultBaseUrl = 'https://api-lej.guidev.site';
   static const String connectionWarning =
       'Sem conexao com a internet. Verifique sua rede e tente novamente.';
 
@@ -15,7 +27,7 @@ class ApiService {
   late String _baseUrl;
 
   ApiService() {
-    _baseUrl = dotenv.get('API_BASE_URL', fallback: 'http://localhost:3000');
+    _baseUrl = dotenv.get('API_BASE_URL', fallback: defaultBaseUrl);
 
     _dio = Dio(BaseOptions(
       baseUrl: _baseUrl,
@@ -287,6 +299,33 @@ class ApiService {
     }
   }
 
+  Future<AuthResponse> confirmResetPassword({
+    required String newPassword,
+    String? code,
+    String? accessToken,
+    String? refreshToken,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/auth/confirm-reset-password',
+        data: {
+          'password': newPassword,
+          if (code != null && code.isNotEmpty) 'code': code,
+          if (accessToken != null && accessToken.isNotEmpty)
+            'accessToken': accessToken,
+          if (refreshToken != null && refreshToken.isNotEmpty)
+            'refreshToken': refreshToken,
+        },
+      );
+      return AuthResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      return AuthResponse(
+        success: false,
+        error: e.response?.data['message'] ?? 'Erro ao atualizar senha',
+      );
+    }
+  }
+
   Future<dynamic> updateProfile({
     required String name,
     String? picture,
@@ -357,6 +396,16 @@ class ApiService {
     } catch (e) {
       print('Erro em getProducts: $e');
       throw Exception('Não foi possível carregar produtos');
+    }
+  }
+
+  Future<Product> getProductById(String id) async {
+    try {
+      final response = await _dio.get('/products/$id');
+      return Product.fromJson(Map<String, dynamic>.from(response.data));
+    } catch (e) {
+      print('Erro em getProductById: $e');
+      throw Exception('Nao foi possivel carregar o produto');
     }
   }
 
@@ -478,6 +527,67 @@ class ApiService {
     await _dio.delete('/products/$id');
   }
 
+  Future<String> generateCatalogDescription({
+    required String name,
+    required String itemType,
+    String? categoryName,
+    String? subcategoryName,
+  }) async {
+    try {
+      final response = await _dio.post('/analytics/catalog-description', data: {
+        'name': name,
+        'itemType': itemType,
+        'categoryName': categoryName,
+        'subcategoryName': subcategoryName,
+      });
+
+      final data = Map<String, dynamic>.from(response.data ?? {});
+      if (data['success'] == true && data['description'] != null) {
+        return data['description'].toString();
+      }
+
+      throw Exception(data['error']?.toString() ?? 'Erro ao gerar descricao');
+    } catch (e) {
+      print('Erro em generateCatalogDescription: $e');
+      rethrow;
+    }
+  }
+
+  Future<GeneratedCatalogImage> generateCatalogImage({
+    required String name,
+    required String itemType,
+    String? categoryName,
+    String? subcategoryName,
+  }) async {
+    try {
+      final response = await _dio.post('/analytics/catalog-image', data: {
+        'name': name,
+        'itemType': itemType,
+        'categoryName': categoryName,
+        'subcategoryName': subcategoryName,
+      });
+
+      final data = Map<String, dynamic>.from(response.data ?? {});
+      if (data['success'] == true && data['imageBase64'] != null) {
+        final safeName = name
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+            .replaceAll(RegExp(r'^-+|-+$'), '');
+
+        return GeneratedCatalogImage(
+          bytes: base64Decode(data['imageBase64'].toString()),
+          fileName:
+              '${safeName.isEmpty ? 'catalogo' : safeName}-ia-${DateTime.now().millisecondsSinceEpoch}.png',
+        );
+      }
+
+      throw Exception(data['error']?.toString() ?? 'Erro ao gerar imagem');
+    } catch (e) {
+      print('Erro em generateCatalogImage: $e');
+      rethrow;
+    }
+  }
+
   Future<List<String>> getFavorites(String token) async {
     try {
       final res = await _dio.get('/favorites',
@@ -532,8 +642,11 @@ class ApiService {
       final oldAuth = _dio.options.headers['Authorization'];
       _dio.options.headers['Authorization'] = 'Bearer $token';
       final response = await _dio.post('/banners', data: {'image_url': imageUrl, 'active': active});
-      if (oldAuth != null) _dio.options.headers['Authorization'] = oldAuth;
-      else _dio.options.headers.remove('Authorization');
+      if (oldAuth != null) {
+        _dio.options.headers['Authorization'] = oldAuth;
+      } else {
+        _dio.options.headers.remove('Authorization');
+      }
       return response.data as Map<String, dynamic>;
     } catch (e) {
       print('Erro createBanner(): $e');
@@ -546,8 +659,11 @@ class ApiService {
       final oldAuth = _dio.options.headers['Authorization'];
       _dio.options.headers['Authorization'] = 'Bearer $token';
       await _dio.delete('/banners/$id');
-      if (oldAuth != null) _dio.options.headers['Authorization'] = oldAuth;
-      else _dio.options.headers.remove('Authorization');
+      if (oldAuth != null) {
+        _dio.options.headers['Authorization'] = oldAuth;
+      } else {
+        _dio.options.headers.remove('Authorization');
+      }
     } catch (e) {
       print('Erro deleteBanner(): $e');
       rethrow;

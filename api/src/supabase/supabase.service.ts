@@ -83,9 +83,45 @@ export class SupabaseService {
     return { success: true };
   }
 
+  async resetPasswordForEmail(email: string, redirectTo: string) {
+    const authClient = this.getAuthClient();
+    return await authClient.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+  }
+
   async exchangeCodeForSession(code: string) {
     const authClient = this.getAuthClient();
     return await authClient.auth.exchangeCodeForSession(code);
+  }
+
+  async updatePasswordWithRecoveryCode(code: string, password: string) {
+    const authClient = this.getAuthClient();
+    const sessionResult = await authClient.auth.exchangeCodeForSession(code);
+
+    if (sessionResult.error) {
+      return { data: null, error: sessionResult.error };
+    }
+
+    return await authClient.auth.updateUser({ password });
+  }
+
+  async updatePasswordWithRecoveryTokens(
+    accessToken: string,
+    refreshToken: string,
+    password: string,
+  ) {
+    const authClient = this.getAuthClient();
+    const sessionResult = await authClient.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+
+    if (sessionResult.error) {
+      return { data: null, error: sessionResult.error };
+    }
+
+    return await authClient.auth.updateUser({ password });
   }
 
   async signInWithIdToken(idToken: string) {

@@ -13,6 +13,12 @@ class AdminSalesScreen extends StatefulWidget {
 
 class _AdminSalesScreenState extends State<AdminSalesScreen> {
   static const Color _primary = Color(0xFFFDA516);
+  static const Color _primaryDark = Color(0xFFF97316);
+  static const LinearGradient _brandGradient = LinearGradient(
+    colors: [_primary, _primaryDark],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
   static const Color _dark = Color(0xFF111827);
   static const Color _muted = Color(0xFF64748B);
   static const Color _surface = Color(0xFFF8FAFC);
@@ -307,7 +313,7 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
 
   String _deliveryLabel(Order order) {
     return _readString(order, ['deliveryType', 'deliveryMethod']) ??
-        'Entrega/retirada não informada';
+        'Retirada';
   }
 
   String _addressLabel(Order order) {
@@ -1168,36 +1174,64 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
     return Scaffold(
       backgroundColor: _surface,
       appBar: AppBar(
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        surfaceTintColor: Colors.white,
-        title: const Text('Vendas',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        toolbarHeight: 72,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: _brandGradient,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+          ),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
+        ),
+        title: const Column(
+          children: [
+            Text(
+              'Vendas',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.2,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'Painel administrativo',
+              style: TextStyle(
+                color: Color(0xFFFFF7ED),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
       body: Consumer<OrdersProvider>(
         builder: (context, ordersProvider, _) {
           if (ordersProvider.isLoading) {
-            return Column(children: [
-              _buildFilters(),
-              Expanded(child: _buildLoadingList())
-            ]);
+            return ListView(
+              children: [
+                _buildFilters(),
+                SizedBox(
+                  height: 420,
+                  child: _buildLoadingList(),
+                ),
+              ],
+            );
           }
 
           final filteredOrders = _filteredOrders(ordersProvider.orders);
 
-          return Container(
-            color: Colors.white,
-            child: Column(
+          if (filteredOrders.isEmpty) {
+            return ListView(
               children: [
                 _buildFilters(),
                 _buildSummary(filteredOrders),
-                Expanded(
-                  child: filteredOrders.isEmpty
-                      ? Center(
+                Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Column(
@@ -1239,16 +1273,28 @@ class _AdminSalesScreenState extends State<AdminSalesScreen> {
                               ],
                             ),
                           ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                          itemCount: filteredOrders.length,
-                          itemBuilder: (context, index) =>
-                              _buildOrderCard(context, filteredOrders[index]),
-                        ),
                 ),
               ],
-            ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.only(bottom: 16),
+            itemCount: filteredOrders.length + 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildFilters();
+              }
+
+              if (index == 1) {
+                return _buildSummary(filteredOrders);
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildOrderCard(context, filteredOrders[index - 2]),
+              );
+            },
           );
         },
       ),

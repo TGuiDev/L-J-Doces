@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 class QRScannerScreen extends StatefulWidget {
-  const QRScannerScreen({Key? key}) : super(key: key);
+  const QRScannerScreen({super.key});
 
   @override
   State<QRScannerScreen> createState() => _QRScannerScreenState();
@@ -81,7 +81,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               onDetect: (capture) {
                 if (_hasScanned || capture.barcodes.isEmpty) return;
                 final barcode = capture.barcodes.first;
-                final value = barcode?.rawValue ?? barcode?.displayValue;
+                final value = barcode.rawValue ?? barcode.displayValue;
                 if (value == null || value.isEmpty) return;
 
                 _hasScanned = true;

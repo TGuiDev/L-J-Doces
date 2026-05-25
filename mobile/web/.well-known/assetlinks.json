@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "br.com.lejdoces.app",
+      "sha256_cert_fingerprints": [
+        "c0:fc:3c:71:3f:09:a4:33:84:ac:08:f7:d9:1f:ca:43:0d:cb:c6:46:6f:ff:92:84:ce:45:71:bd:c2:c8:f9:f9"
+      ]
+    }
+  }
+]

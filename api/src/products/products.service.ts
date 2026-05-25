@@ -6,7 +6,7 @@ export class ProductsService {
   constructor(private supabase: SupabaseService) {}
 
   private readonly productSelect =
-    'id, name, description, price, images, category_id, subcategory_id, available_days, stock_quantity, created_at, category:categories(id, name), subcategory:subcategories(id, name)';
+    'id, name, description, ingredients, price, cost_price, images, category_id, subcategory_id, available_days, stock_quantity, created_at, category:categories(id, name), subcategory:subcategories(id, name)';
 
   async getProducts() {
     const client = this.supabase.getClient();
@@ -75,6 +75,18 @@ export class ProductsService {
       .from('products')
       .select(this.productSelect)
       .eq('category_id', categoryId);
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async getProductById(id: string) {
+    const client = this.supabase.getClient();
+    const { data, error } = await client
+      .from('products')
+      .select(this.productSelect)
+      .eq('id', id)
+      .single();
+
     if (error) throw new BadRequestException(error.message);
     return data;
   }

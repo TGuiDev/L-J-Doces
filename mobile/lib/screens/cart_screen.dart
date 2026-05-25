@@ -8,10 +8,10 @@ class CartScreen extends StatelessWidget {
   final VoidCallback? onContinueShopping;
 
   const CartScreen({
-    Key? key,
+    super.key,
     this.isRoot = false,
     this.onContinueShopping,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -20,9 +21,9 @@ class ShimmerLoading extends StatefulWidget {
   final Widget child;
 
   const ShimmerLoading({
-    Key? key,
+    super.key,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<ShimmerLoading> createState() => _ShimmerLoadingState();
@@ -82,7 +83,12 @@ class HomeScreen extends StatefulWidget {
   static final GlobalKey<_HomeScreenState> globalKey =
       GlobalKey<_HomeScreenState>();
 
-  const HomeScreen({Key? key}) : super(key: key);
+  final List<Product> initialTopOrderedProducts;
+
+  const HomeScreen({
+    super.key,
+    this.initialTopOrderedProducts = const [],
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -114,26 +120,42 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     _homeScrollController.addListener(_onScroll);
+    _topOrderedProducts = List<Product>.of(widget.initialTopOrderedProducts);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final adminProvider = context.read<AdminProvider>();
-
-      await adminProvider.fetchCategories();
-
-      await adminProvider.fetchProductsPage(
-        refresh: true,
-        forceApiRefresh: true,
-        categoryId: _selectedCategoryId,
-        subcategoryId: _selectedSubcategoryId,
-      );
-
       final authProvider = context.read<AuthProvider>();
+      final initialLoadTasks = <Future<void>>[];
 
-      if (authProvider.isAuthenticated && authProvider.token != null) {
-        context.read<FavoritesProvider>().fetchFavorites(authProvider.token!);
+      if (adminProvider.categories.isEmpty) {
+        initialLoadTasks.add(adminProvider.fetchCategories());
       }
 
-      await _loadTopOrderedProducts();
+      if (adminProvider.allProducts.isEmpty || adminProvider.products.isEmpty) {
+        initialLoadTasks.add(
+          adminProvider.fetchProductsPage(
+            refresh: true,
+            forceApiRefresh: adminProvider.allProducts.isEmpty,
+            categoryId: _selectedCategoryId,
+            subcategoryId: _selectedSubcategoryId,
+          ),
+        );
+      }
+
+      if (authProvider.isAuthenticated && authProvider.token != null) {
+        final favoritesProvider = context.read<FavoritesProvider>();
+        if (favoritesProvider.favoriteProductIds.isEmpty) {
+          initialLoadTasks.add(
+            favoritesProvider.fetchFavorites(authProvider.token!),
+          );
+        }
+      }
+
+      await Future.wait<void>(initialLoadTasks);
+
+      if (_topOrderedProducts.isEmpty) {
+        await _loadTopOrderedProducts();
+      }
     });
   }
 
@@ -153,11 +175,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onScroll() {
     if (!_homeScrollController.hasClients) return;
+    if (_showFavoritesOnly || _selectedCategoryId == null) return;
 
     final position = _homeScrollController.position;
+    final adminProvider = context.read<AdminProvider>();
 
-    if (position.pixels >= position.maxScrollExtent - 850) {
-      context.read<AdminProvider>().fetchProductsPage(
+    if (position.pixels >= position.maxScrollExtent - 850 &&
+        adminProvider.hasMoreProducts &&
+        !adminProvider.isLoadingProducts) {
+      adminProvider.fetchProductsPage(
             categoryId: _selectedCategoryId,
             subcategoryId: _selectedSubcategoryId,
           );
@@ -399,9 +425,9 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(
             child: _buildHeroBanner(),
           ),
-          SliverToBoxAdapter(
-            child: _buildQuickActions(),
-          ),
+          // SliverToBoxAdapter(
+          //   child: _buildQuickActions(),
+          // ),
           SliverToBoxAdapter(
             child: _buildSearchBox(),
           ),
@@ -480,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
             subtitle: 'Os 10 itens mais comprados',
           ),
           SizedBox(
-            height: 244,
+            height: 200,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -489,7 +515,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final product = mostOrdered[index];
 
                 return SizedBox(
-                  width: 164,
+                  width: 160,
                   child: Padding(
                     padding: EdgeInsets.only(
                       right: index == mostOrdered.length - 1 ? 0 : 12,
@@ -500,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
         ],
       ),
     );
@@ -636,41 +662,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 1.05,
                   ),
                 ),
-                const SizedBox(height: 14),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    if (_homeScrollController.hasClients) {
-                      _homeScrollController.animateTo(
-                        360,
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeOut,
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF1F1F1F),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(
-                    Icons.local_fire_department_rounded,
-                    color: Color(0xFFFF7A00),
-                    size: 20,
-                  ),
-                  label: const Text(
-                    'Ver produtos',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
+                // const SizedBox(height: 14),
+                // ElevatedButton.icon(
+                //   onPressed: () {
+                //     if (_homeScrollController.hasClients) {
+                //       _homeScrollController.animateTo(
+                //         360,
+                //         duration: const Duration(milliseconds: 400),
+                //         curve: Curves.easeOut,
+                //       );
+                //     }
+                //   },
+                //   style: ElevatedButton.styleFrom(
+                //     elevation: 0,
+                //     backgroundColor: Colors.white,
+                //     foregroundColor: const Color(0xFF1F1F1F),
+                //     padding: const EdgeInsets.symmetric(
+                //       horizontal: 14,
+                //       vertical: 10,
+                //     ),
+                //     shape: RoundedRectangleBorder(
+                //       borderRadius: BorderRadius.circular(14),
+                //     ),
+                //   ),
+                //   icon: const Icon(
+                //     Icons.local_fire_department_rounded,
+                //     color: Color(0xFFFF7A00),
+                //     size: 20,
+                //   ),
+                //   label: const Text(
+                //     'Ver produtos',
+                //     style: TextStyle(
+                //       fontWeight: FontWeight.w900,
+                //     ),
+                //   ),
+                // ),
               ],
             ),
           ),
@@ -679,32 +705,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: _QuickActionCard(
-              icon: Icons.cake_outlined,
-              title: 'Sob encomenda',
-              subtitle: 'Planeje seu pedido',
-              color: const Color(0xFFFF7A00),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _QuickActionCard(
-              icon: Icons.schedule_rounded,
-              title: 'Para hoje',
-              subtitle: 'Pronta entrega',
-              color: Colors.green.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _buildQuickActions() {
+  //   return Padding(
+  //     padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+  //     child: Row(
+  //       children: [
+  //         Expanded(
+  //           child: _QuickActionCard(
+  //             icon: Icons.cake_outlined,
+  //             title: 'Sob encomenda',
+  //             subtitle: 'Planeje seu pedido',
+  //             color: const Color(0xFFFF7A00),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 12),
+  //         Expanded(
+  //           child: _QuickActionCard(
+  //             icon: Icons.schedule_rounded,
+  //             title: 'Para hoje',
+  //             subtitle: 'Pronta entrega',
+  //             color: Colors.green.shade600,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildSearchBox() {
     return Padding(
@@ -920,7 +946,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   _selectedCategoryId = null;
                   _selectedSubcategoryId = null;
                 });
-                _reloadProducts(forceApiRefresh: true);
+
+                final adminProvider = context.read<AdminProvider>();
+                if (adminProvider.allProducts.isEmpty) {
+                  _reloadProducts(forceApiRefresh: true);
+                }
               },
             );
           }
@@ -1147,7 +1177,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return _ProductCard(product: product);
           },
           childCount: products.length,
-          addAutomaticKeepAlives: false,
+          addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
           addSemanticIndexes: false,
         ),
@@ -1527,10 +1557,13 @@ class _CategoryCard extends StatelessWidget {
                   ? Stack(
                       fit: StackFit.expand,
                       children: [
-                        Image.network(
-                          imageUrl!,
+                        CachedNetworkImage(
+                          imageUrl: imageUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) {
+                          placeholder: (_, __) => Container(
+                            color: Colors.grey[200],
+                          ),
+                          errorWidget: (_, __, ___) {
                             return Icon(
                               icon,
                               color:
@@ -1667,13 +1700,18 @@ class _HorizontalProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              height: 134,
+              height: 112,
               width: double.infinity,
-              child: FadeInImage.assetNetwork(
-                placeholder: 'lib/assets/images/Logo.png',
-                image: imageUrl,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
                 fit: BoxFit.cover,
-                imageErrorBuilder: (_, __, ___) {
+                placeholder: (_, __) {
+                  return const Image(
+                    image: AssetImage('lib/assets/images/Logo.png'),
+                    fit: BoxFit.contain,
+                  );
+                },
+                errorWidget: (_, __, ___) {
                   return Container(
                     color: Colors.grey[200],
                     child: const Icon(
@@ -1770,12 +1808,17 @@ class _ProductCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      FadeInImage.assetNetwork(
-                        placeholder: 'lib/assets/images/Logo.png',
-                        image: imageUrl,
+                      CachedNetworkImage(
+                        imageUrl: imageUrl,
                         fit: BoxFit.cover,
+                        placeholder: (_, __) {
+                          return const Image(
+                            image: AssetImage('lib/assets/images/Logo.png'),
+                            fit: BoxFit.contain,
+                          );
+                        },
                         fadeInDuration: const Duration(milliseconds: 250),
-                        imageErrorBuilder: (_, __, ___) {
+                        errorWidget: (_, __, ___) {
                           return Container(
                             color: Colors.grey[200],
                             child: const Center(

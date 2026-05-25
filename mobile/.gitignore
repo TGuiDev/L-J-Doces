@@ -81,7 +81,6 @@ app.*.map.json
 **/windows/flutter/generated_plugins.cmake
 
 # Web
-lib/generated_plugin_registrant.dart
 
 # Symbolication related
 app.*.symbols
@@ -137,3 +136,6 @@ coverage/
 # Exclude Android Studio history because of it frequently changing
 gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.jar
+
+.vercel
+.env*.local

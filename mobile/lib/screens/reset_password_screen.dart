@@ -3,8 +3,31 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 
+class ResetPasswordLinkData {
+  final String? code;
+  final String? accessToken;
+  final String? refreshToken;
+
+  const ResetPasswordLinkData({
+    this.code,
+    this.accessToken,
+    this.refreshToken,
+  });
+
+  bool get hasRecoveryCredentials {
+    return (code != null && code!.isNotEmpty) ||
+        ((accessToken != null && accessToken!.isNotEmpty) &&
+            (refreshToken != null && refreshToken!.isNotEmpty));
+  }
+}
+
 class ResetPasswordScreen extends StatefulWidget {
-  const ResetPasswordScreen({Key? key}) : super(key: key);
+  final ResetPasswordLinkData? linkData;
+
+  const ResetPasswordScreen({
+    super.key,
+    this.linkData,
+  });
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -15,6 +38,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  ResetPasswordLinkData? _linkData;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is ResetPasswordLinkData) {
+      _linkData = args;
+    } else {
+      _linkData = widget.linkData;
+    }
+  }
 
   @override
   void dispose() {
@@ -47,7 +83,35 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       return;
     }
 
-    final success = await authProvider.updatePassword(newPassword: _passwordController.text);
+    if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)')
+        .hasMatch(_passwordController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A senha precisa ter letra maiuscula, minuscula e numero',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final linkData = _linkData;
+
+    if (linkData == null || !linkData.hasRecoveryCredentials) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Link de redefinicao invalido ou expirado'),
+        ),
+      );
+      return;
+    }
+
+    final success = await authProvider.confirmResetPassword(
+      newPassword: _passwordController.text,
+      code: linkData.code,
+      accessToken: linkData.accessToken,
+      refreshToken: linkData.refreshToken,
+    );
 
     if (!mounted) return;
 

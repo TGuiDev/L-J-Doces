@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
-import '../services/firebase_service.dart';
+
 import '../providers/auth_provider.dart';
-import '../widgets/custom_text_field.dart';
+import '../services/firebase_service.dart';
 import '../theme/app_theme.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({Key? key}) : super(key: key);
+  const SignInScreen({super.key});
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -17,6 +15,7 @@ class SignInScreen extends StatefulWidget {
 class _SignInScreenState extends State<SignInScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _obscurePassword = true;
   bool _rememberMe = false;
   bool _showResendConfirmation = false;
@@ -28,7 +27,7 @@ class _SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  void _handleSignIn(BuildContext context) async {
+  Future<void> _handleSignIn(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
 
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -39,40 +38,40 @@ class _SignInScreenState extends State<SignInScreen> {
     }
 
     final success = await authProvider.signIn(
-      email: _emailController.text,
+      email: _emailController.text.trim(),
       password: _passwordController.text,
     );
 
     if (!mounted) return;
 
     if (success) {
-      setState(() {
-        _showResendConfirmation = false;
-      });
+      setState(() => _showResendConfirmation = false);
       Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      // Verificar se é erro de email não confirmado
-      final error = authProvider.error ?? '';
-      setState(() {
-        _showResendConfirmation = error.contains('confirme seu email') || error.contains('EMAIL_NOT_CONFIRMED');
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(authProvider.error ?? 'Erro ao fazer login')),
-      );
+      return;
     }
+
+    final error = authProvider.error ?? '';
+    setState(() {
+      _showResendConfirmation =
+          error.contains('confirme seu email') ||
+          error.contains('EMAIL_NOT_CONFIRMED');
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(authProvider.error ?? 'Erro ao fazer login')),
+    );
   }
 
-  void _handleGoogleSignIn() async {
+  Future<void> _handleGoogleSignIn() async {
     try {
-      print('[SignInScreen] Chamando FirebaseService.signInWithGoogle()...');
       final idToken = await FirebaseService.signInWithGoogle();
 
       if (idToken == null || idToken.isEmpty) {
-        print('[SignInScreen] Falha ao obter token do Google');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao obter token do Google. Tente novamente.')),
+            const SnackBar(
+              content: Text('Erro ao obter token do Google. Tente novamente.'),
+            ),
           );
         }
         return;
@@ -99,7 +98,7 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
-  void _handleResendConfirmation(BuildContext context) async {
+  Future<void> _handleResendConfirmation(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
     final email = _emailController.text.trim();
 
@@ -110,22 +109,22 @@ class _SignInScreenState extends State<SignInScreen> {
       return;
     }
 
-    final success = await authProvider.resendConfirmationEmail(email: email);
+    await authProvider.resendConfirmationEmail(email: email);
 
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(authProvider.error ?? 'Erro ao reenviar email')),
+      SnackBar(content: Text(authProvider.error ?? 'Email reenviado')),
     );
   }
 
-  void _handleForgotPassword(BuildContext context) async {
-    final TextEditingController emailController = TextEditingController();
+  Future<void> _handleForgotPassword(BuildContext context) async {
+    final emailController = TextEditingController();
     bool isLoading = false;
 
     await showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
@@ -143,10 +142,10 @@ class _SignInScreenState extends State<SignInScreen> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       hintText: 'seu@email.com',
+                      prefixIcon: const Icon(Icons.mail_outline_rounded),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                   ),
                 ],
@@ -157,33 +156,37 @@ class _SignInScreenState extends State<SignInScreen> {
                   child: const Text('Cancelar'),
                 ),
                 ElevatedButton(
-                  onPressed: isLoading ? null : () async {
-                    final email = emailController.text.trim();
-                    if (email.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Digite seu email')),
-                      );
-                      return;
-                    }
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          final email = emailController.text.trim();
+                          if (email.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Digite seu email')),
+                            );
+                            return;
+                          }
 
-                    setState(() => isLoading = true);
+                          setState(() => isLoading = true);
 
-                    final authProvider = context.read<AuthProvider>();
-                    final success = await authProvider.resetPassword(email: email);
+                          final authProvider = context.read<AuthProvider>();
+                          final success =
+                              await authProvider.resetPassword(email: email);
 
-                    setState(() => isLoading = false);
+                          setState(() => isLoading = false);
 
-                    if (success) {
-                      Navigator.maybePop(dialogContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(authProvider.error ?? 'Email enviado')),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(authProvider.error ?? 'Erro ao enviar email')),
-                      );
-                    }
-                  },
+                          if (success) {
+                            Navigator.maybePop(dialogContext);
+                          }
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                authProvider.error ?? 'Email enviado',
+                              ),
+                            ),
+                          );
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryOrange,
                     foregroundColor: Colors.white,
@@ -194,7 +197,8 @@ class _SignInScreenState extends State<SignInScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : const Text('Enviar'),
@@ -205,328 +209,368 @@ class _SignInScreenState extends State<SignInScreen> {
         );
       },
     );
+
+    emailController.dispose();
+  }
+
+  InputDecoration _authInputDecoration({
+    required String hintText,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      hintText: hintText,
+      prefixIcon: Icon(icon, color: AppTheme.primaryOrange, size: 21),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: const Color(0xFFFFFBF5),
+      hintStyle: TextStyle(
+        color: Colors.grey[500],
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: Colors.orange.withOpacity(0.12)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppTheme.primaryOrange, width: 1.4),
+      ),
+    );
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Back Button
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                  onPressed: () {
-                    Navigator.maybePop(context);
-                  },
+      backgroundColor: const Color(0xFFFFF8EF),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFFA33A),
+              Color(0xFFFFC56D),
+              Color(0xFFFFF8EF),
+            ],
+            stops: [0, 0.34, 0.82],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    color: Colors.white,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.18),
+                    ),
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
                 ),
-              ),
-
-              // Illustration (Candy Shop placeholder)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 10.0),
-                child: Center(
-                  child: Image.asset(
-                    'lib/assets/images/app_icon.png',
-                    height: 180,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => const Icon(
-                      Icons.storefront_outlined,
-                      size: 150,
-                      color: AppTheme.primaryOrange
+                const SizedBox(height: 10),
+                Center(
+                  child: Container(
+                    width: 132,
+                    height: 132,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.24),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.35),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Image.asset(
+                      'lib/assets/images/app_icon.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(
+                        Icons.storefront_rounded,
+                        size: 72,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // White Card
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24.0),
-                padding: const EdgeInsets.all(24.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+                const SizedBox(height: 18),
+                const Text(
+                  'Bem-vindo de volta',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Google Button
-                    OutlinedButton(
-                      onPressed: _handleGoogleSignIn,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        side: BorderSide(color: Colors.grey[300]!),
+                const SizedBox(height: 6),
+                Text(
+                  'Entre para continuar seus pedidos na L&J Doces.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.92),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 26),
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 26,
+                        offset: const Offset(0, 14),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _handleGoogleSignIn,
+                        icon: Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF3F7FF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Text(
+                            'G',
+                            style: TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        label: const Text('Continuar com Google'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1F2937),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: Colors.grey.shade200),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Row(
                         children: [
-                          RichText(
-                            text: const TextSpan(
-                              text: 'G',
+                          Expanded(child: Divider(color: Colors.grey[200])),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Text(
+                              'ou entre com email',
                               style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
+                                color: Colors.grey[500],
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Continue com Google',
-                            style: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
+                          Expanded(child: Divider(color: Colors.grey[200])),
+                        ],
+                      ),
+                      const SizedBox(height: 22),
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: _authInputDecoration(
+                          hintText: 'usuario@gmail.com',
+                          icon: Icons.mail_outline_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: _authInputDecoration(
+                          hintText: 'Sua senha',
+                          icon: Icons.lock_outline_rounded,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: Colors.grey[500],
+                              size: 20,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  side: BorderSide(color: Colors.grey[300]!),
+                                  activeColor: AppTheme.primaryOrange,
+                                  checkColor: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Lembrar',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          TextButton(
+                            onPressed: () => _handleForgotPassword(context),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Esqueceu a senha?',
+                              style: TextStyle(
+                                color: AppTheme.primaryOrange,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Divider
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: Colors.grey[300])),
+                      const SizedBox(height: 22),
+                      Consumer<AuthProvider>(
+                        builder: (context, authProvider, child) {
+                          return ElevatedButton(
+                            onPressed: authProvider.isLoading
+                                ? null
+                                : () => _handleSignIn(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryOrange,
+                              disabledBackgroundColor:
+                                  AppTheme.primaryOrange.withOpacity(0.45),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: authProvider.isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Entrar',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      if (_showResendConfirmation)
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Ou entre com:',
-                            style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                          ),
-                        ),
-                        Expanded(child: Divider(color: Colors.grey[300])),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Email Field
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'usuario@gmail.com',
-                        hintStyle: TextStyle(color: Colors.black87, fontWeight: FontWeight.w500, fontSize: 14),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppTheme.primaryOrange),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password Field
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(fontSize: 14, letterSpacing: 2),
-                      decoration: InputDecoration(
-                        hintText: '********',
-                        hintStyle: TextStyle(color: Colors.black87, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 14),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppTheme.primaryOrange),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            color: Colors.grey[500],
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Lembre de mim & Esqueceu a senha
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: Checkbox(
-                                value: _rememberMe,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _rememberMe = value ?? false;
-                                  });
-                                },
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                side: BorderSide(color: Colors.grey[400]!),
-                                activeColor: AppTheme.primaryOrange,
-                                checkColor: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Lembre de mim',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                        TextButton(
-                          onPressed: () => _handleForgotPassword(context),
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text(
-                            'Esqueceu a senha ?',
-                            style: TextStyle(
-                              color: AppTheme.primaryOrange,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Entrar Button
-                    Consumer<AuthProvider>(
-                      builder: (context, authProvider, child) {
-                        return ElevatedButton(
-                          onPressed:
-                              authProvider.isLoading ? null : () => _handleSignIn(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryOrange,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: authProvider.isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text(
-                                  'Entrar',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Botão de reenviar confirmação (mostrado apenas quando necessário)
-                    if (_showResendConfirmation)
-                      Column(
-                        children: [
-                          TextButton(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: TextButton(
                             onPressed: () => _handleResendConfirmation(context),
                             style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
-                              backgroundColor: Colors.orange[50],
+                              backgroundColor: const Color(0xFFFFF4E8),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                             child: const Text(
-                              'Reenviar email de confirmação',
+                              'Reenviar email de confirmacao',
                               style: TextStyle(
                                 color: AppTheme.primaryOrange,
                                 fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-
-                    // Register Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Não tem uma conta? ',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
-                          ),
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(context, '/signup');
-                          },
-                          child: const Text(
-                            'Registrar-se',
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Nao tem uma conta? ',
                             style: TextStyle(
-                              color: AppTheme.primaryOrange,
+                              color: Colors.grey[600],
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          GestureDetector(
+                            onTap: () => Navigator.pushNamed(context, '/signup'),
+                            child: const Text(
+                              'Registrar-se',
+                              style: TextStyle(
+                                color: AppTheme.primaryOrange,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-            ],
+              ],
+            ),
           ),
         ),
       ),

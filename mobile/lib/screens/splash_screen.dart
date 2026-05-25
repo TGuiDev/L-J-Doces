@@ -22,9 +22,9 @@ class _SplashScreenState extends State<SplashScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFF8C00),
-              Color(0xFFFF8C00),
-              Color(0xFFFF8C00),
+              Color(0xFFFFFFFF),
+              Color(0xFFFFFFFF),
+              Color(0xFFFFFFFF),
             ],
             stops: [0.0, 0.55, 1.0],
           ),
@@ -74,17 +74,17 @@ class _SplashScreenState extends State<SplashScreen> {
                       width: 168,
                       height: 168,
                       padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.22),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.10),
-                            blurRadius: 30,
-                            offset: const Offset(0, 16),
-                          ),
-                        ],
-                      ),
+                      // decoration: BoxDecoration(
+                        // color: Colors.white.withOpacity(0.22),
+                        // shape: BoxShape.circle,
+                        // boxShadow: [
+                        //   BoxShadow(
+                        //     color: Colors.black.withOpacity(0.10),
+                        //     blurRadius: 30,
+                        //     offset: const Offset(0, 16),
+                        //   ),
+                        // ],
+                      // ),
                       child: Image.asset(
                         'lib/assets/images/app_splash.png',
                         fit: BoxFit.contain,
@@ -92,39 +92,39 @@ class _SplashScreenState extends State<SplashScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 28),
-                const Text(
-                  'Pedido rápido, sabor caseiro e experiência leve.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF2C2C2C),
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Descubra produtos, monte seu pedido e acompanhe tudo em um fluxo mais agradável desde a abertura do app.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.45,
-                    color: Colors.black.withOpacity(0.70),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                const Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _FeatureChip(label: 'Catálogo rápido'),
-                    _FeatureChip(label: 'Favoritos salvos'),
-                    _FeatureChip(label: 'Pedidos em tempo real'),
-                  ],
-                ),
+                // const SizedBox(height: 28),
+                // const Text(
+                //   'Pedido rápido, sabor caseiro e experiência leve.',
+                //   textAlign: TextAlign.center,
+                //   style: TextStyle(
+                //     fontSize: 24,
+                //     fontWeight: FontWeight.w800,
+                //     color: Color(0xFF2C2C2C),
+                //     height: 1.15,
+                //   ),
+                // ),
+                // const SizedBox(height: 75),
+                // Text(
+                //   'Descubra produtos, monte seu pedido e acompanhe tudo em um fluxo mais agradável desde a abertura do app.',
+                //   textAlign: TextAlign.center,
+                //   style: TextStyle(
+                //     fontSize: 14,
+                //     height: 1.45,
+                //     color: Colors.black.withOpacity(0.70),
+                //     fontWeight: FontWeight.w500,
+                //   ),
+                // ),
+                // const SizedBox(height: 22),
+                // const Wrap(
+                //   alignment: WrapAlignment.center,
+                //   spacing: 10,
+                //   runSpacing: 10,
+                //   children: [
+                //     _FeatureChip(label: 'Catálogo rápido'),
+                //     _FeatureChip(label: 'Favoritos salvos'),
+                //     _FeatureChip(label: 'Pedidos em tempo real'),
+                //   ],
+                // ),
                 const Spacer(),
                 TweenAnimationBuilder<double>(
                   tween: Tween<double>(begin: 0.35, end: 1),
@@ -133,7 +133,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   builder: (context, value, child) {
                     return Opacity(opacity: value, child: child);
                   },
-                  child: Column(
+                  child: const Column(
                     children: [
                       SizedBox(
                         width: 44,
@@ -145,11 +145,11 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                       SizedBox(height: 14),
                       Text(
-                        'Preparando sua vitrine e sessão segura...',
+                        'Preparando sua vitrine...',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF6B6B6B),
+                          color: Color.fromARGB(255, 255, 115, 0),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -165,6 +165,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
+// ignore: unused_element
 class _FeatureChip extends StatelessWidget {
   const _FeatureChip({required this.label});
 

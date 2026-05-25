@@ -9,7 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 class OrdersScreen extends StatefulWidget {
   final bool showBackButton;
 
-  const OrdersScreen({Key? key, this.showBackButton = true}) : super(key: key);
+  const OrdersScreen({super.key, this.showBackButton = true});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -155,34 +155,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      // backgroundColor: const Color(0xFFF8F7F5),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        backgroundColor: const Color(0xFFF8F7F5),
         title: const Text('Minhas Compras',
             style: TextStyle(color: Colors.black87)),
-        leading: widget.showBackButton
-            ? IconButton(
-                icon:
-                    const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
-                onPressed: () => Navigator.maybePop(context),
-              )
-            : null,
+        // leading: widget.showBackButton
+        //     ? IconButton(
+        //         icon:
+        //             const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
+        //         onPressed: () => Navigator.maybePop(context),
+        //       )
+        //     : null,
       ),
-      body: Column(
-        children: [
-          _buildSearchAndFilters(),
-          Expanded(
-            child: Consumer<OrdersProvider>(
-              builder: (context, ordersProvider, child) {
-                if (ordersProvider.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.orange),
-                  );
-                }
+      body: Consumer<OrdersProvider>(
+        builder: (context, ordersProvider, child) {
+          if (ordersProvider.isLoading) {
+            return ListView(
+              children: [
+                _buildSearchAndFilters(),
+                const SizedBox(
+                  height: 280,
+                  child: Center(
+                    child: CircularProgressIndicator(color: Color(0xFFF8F7F5)),
+                  ),
+                ),
+              ],
+            );
+          }
 
-                if (ordersProvider.error != null) {
-                  return Center(
+          if (ordersProvider.error != null) {
+            return ListView(
+              children: [
+                _buildSearchAndFilters(),
+                Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -207,25 +213,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         ElevatedButton(
                           onPressed: () {
                             final token = context.read<AuthProvider>().token;
-                            if (token != null)
+                            if (token != null) {
                               context
                                   .read<OrdersProvider>()
                                   .fetchUserOrders(token);
+                            }
                           },
                           child: const Text('Tentar novamente'),
                         ),
                       ],
                     ),
-                  );
-                }
+                ),
+              ],
+            );
+          }
 
-                if (ordersProvider.orders.isEmpty) {
-                  return Center(
+          if (ordersProvider.orders.isEmpty) {
+            return ListView(
+              children: [
+                _buildSearchAndFilters(),
+                Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.shopping_bag_outlined,
-                            size: 80, color: Colors.grey[300]),
+                            size: 80, color: const Color.fromARGB(255, 224, 224, 224)),
                         const SizedBox(height: 16),
                         Text(
                           'Nenhuma compra realizada',
@@ -234,13 +246,18 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         ),
                       ],
                     ),
-                  );
-                }
+                ),
+              ],
+            );
+          }
 
-                var orders = _applyFilters(ordersProvider.orders);
+          var orders = _applyFilters(ordersProvider.orders);
 
-                if (orders.isEmpty) {
-                  return Center(
+          if (orders.isEmpty) {
+            return ListView(
+              children: [
+                _buildSearchAndFilters(),
+                Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: Column(
@@ -264,21 +281,27 @@ class _OrdersScreenState extends State<OrdersScreen> {
                         ],
                       ),
                     ),
-                  );
-                }
+                ),
+              ],
+            );
+          }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: orders.length,
-                  itemBuilder: (context, index) {
-                    final order = orders[index];
-                    return _buildOrderCard(context, order);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+          return ListView.builder(
+            padding: const EdgeInsets.only(bottom: 16),
+            itemCount: orders.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildSearchAndFilters();
+              }
+
+              final order = orders[index - 1];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildOrderCard(context, order),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -619,7 +642,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
               style: TextStyle(fontSize: 13, color: Colors.grey[700]),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }

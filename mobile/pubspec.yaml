@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
 
   # HTTP and API
   http: ^1.1.0
@@ -56,7 +58,9 @@ dependencies:
   # QR Code
   qr_flutter: ^4.1.0
   mobile_scanner: ^5.2.3
+  app_links: ^6.3.3
   flutter_svg: ^2.2.4
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:

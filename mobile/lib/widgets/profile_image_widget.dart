@@ -11,12 +11,12 @@ class ProfileImageWidget extends StatelessWidget {
   final VoidCallback? onTap;
 
   const ProfileImageWidget({
-    Key? key,
+    super.key,
     this.imageUrl,
     this.radius = 60,
     this.padding,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

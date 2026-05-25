@@ -8,7 +8,7 @@ import '../services/api_service.dart';
 import 'qr_scanner_screen.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
-  const AdminOrdersScreen({Key? key}) : super(key: key);
+  const AdminOrdersScreen({super.key});
 
   @override
   State<AdminOrdersScreen> createState() => _AdminOrdersScreenState();
@@ -16,6 +16,12 @@ class AdminOrdersScreen extends StatefulWidget {
 
 class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   static const Color _primary = Color(0xFFFDA516);
+  static const Color _primaryDark = Color(0xFFF97316);
+  static const LinearGradient _brandGradient = LinearGradient(
+    colors: [_primary, _primaryDark],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
   static const Color _dark = Color(0xFF111827);
   static const Color _muted = Color(0xFF64748B);
   static const Color _surface = Color(0xFFF8FAFC);
@@ -702,33 +708,66 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     return Scaffold(
       backgroundColor: _surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        surfaceTintColor: Colors.white,
-        title: const Text('Gerenciar Pedidos', style: TextStyle(color: _dark, fontWeight: FontWeight.w900)),
+        toolbarHeight: 72,
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: _brandGradient,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: _dark),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Column(
+          children: [
+            Text(
+              'Gerenciar Pedidos',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.2,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'Painel administrativo',
+              style: TextStyle(
+                color: Color(0xFFFFF7ED),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildFilters(),
-          Expanded(
-            child: Consumer<OrdersProvider>(
-              builder: (context, ordersProvider, child) {
-                if (ordersProvider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+      body: Consumer<OrdersProvider>(
+        builder: (context, ordersProvider, child) {
+          if (ordersProvider.isLoading) {
+            return ListView(
+              children: [
+                _buildFilters(),
+                const SizedBox(
+                  height: 280,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ],
+            );
+          }
 
-                final filteredOrders = _filteredOrders(ordersProvider.orders);
+          final filteredOrders = _filteredOrders(ordersProvider.orders);
 
-                if (filteredOrders.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
+          if (filteredOrders.isEmpty) {
+            return ListView(
+              children: [
+                _buildFilters(),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
@@ -744,26 +783,34 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                           TextButton.icon(onPressed: _clearFilters, icon: const Icon(Icons.refresh), label: const Text('Limpar filtros')),
                         ],
                       ),
-                    ),
-                  );
-                }
+                  ),
+                ),
+              ],
+            );
+          }
 
-                return Column(
-                  children: [
-                    _buildSummary(filteredOrders),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                        itemCount: filteredOrders.length,
-                        itemBuilder: (context, index) => _buildOrderCard(context, filteredOrders[index]),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
+          return ListView.builder(
+            padding: const EdgeInsets.only(bottom: 16),
+            itemCount: filteredOrders.length + 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildFilters();
+              }
+
+              if (index == 1) {
+                return _buildSummary(filteredOrders);
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildOrderCard(
+                  context,
+                  filteredOrders[index - 2],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
